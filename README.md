@@ -11,4 +11,19 @@
 
 ## 使い方
 
+### 設定ファイル
+
+`.github/tofu-actions-config.js` を設置し、terraformのディレクトリ一覧を記述してください。
+
+```js
+export default {
+  dirs: [
+    'dev',
+    'prod',
+  ]
+}
+```
+
+### Workflowファイル
+
 `.github/example-workflows/` 以下のファイルを参照してください。
