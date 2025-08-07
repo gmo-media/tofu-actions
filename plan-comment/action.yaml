@@ -24,16 +24,23 @@ runs:
         echo '${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}' >> /tmp/comment.txt
         echo 'and fill `${{ github.run_id }}` to run_id parameter.' >> /tmp/comment.txt
 
-        for file in /tmp/plan-*.txt; do
+        found=false
+        while IFS= read -r -d '' file; do
+          found=true
+        
           dir_name="${file#/tmp/plan-}"
           dir_name="${dir_name%.txt}"
           dir_name="${dir_name//___/\/}"
-          
+        
           echo "### $dir_name" >> /tmp/comment.txt
           echo '```' >> /tmp/comment.txt
           cat $file >> /tmp/comment.txt
           echo '```' >> /tmp/comment.txt
-        done
+        done < <(find . -name '*.txt' -print0)
+        
+        if [ "$found" = false ]; then
+          echo 'No directories were processed.' >> /tmp/comment.txt
+        fi
         
         echo 'comment<<EOF' >> $GITHUB_OUTPUT
         cat /tmp/comment.txt >> $GITHUB_OUTPUT
