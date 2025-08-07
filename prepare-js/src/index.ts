@@ -41,7 +41,9 @@ const getModuleSources = (dir: string): string[] => {
     // Resolve relative path to the project
     .map(moduleSrc => path.relative(process.cwd(), path.resolve(dir, moduleSrc)))
   paths = [...new Set(paths)]
-  console.log(`[terraform-config-inspect] ${dir} is dependent on ${paths.join(', ')}`)
+  if (paths.length > 0) {
+    console.log(`[terraform-config-inspect] ${dir} is dependent on ${paths.join(', ')}`)
+  }
   return paths
 }
 
