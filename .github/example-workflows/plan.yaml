@@ -1,0 +1,35 @@
+# 手動planを行う
+name: Plan
+run-name: Plan (${{ inputs.dir }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      dir:
+        description: Directory to run in
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - prod
+          - ...
+
+env:
+  AWS_REGION: ap-northeast-1
+  TOFU_VERSION: 1.10.4
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+      - uses: gmo-media/tofu-actions/setup-aws-credentials@v1
+        with:
+          aws_credentials: ${{ secrets.AWS_CREDENTIALS }}
+      - uses: gmo-media/tofu-actions/plan@v1
+        with:
+          dir: ${{ inputs.dir }}

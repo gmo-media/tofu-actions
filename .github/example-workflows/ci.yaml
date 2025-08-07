@@ -1,0 +1,61 @@
+# PRでplanを行う
+name: CI
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-1
+  TOFU_VERSION : 1.10.4
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+      - run: tofu fmt -recursive -check
+
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: prepare
+        uses: gmo-media/tofu-actions/prepare@v1
+    outputs:
+      strategy: ${{ steps.prepare.outputs.strategy }}
+
+  plan:
+    needs: [ prepare ]
+    name: Plan (${{ matrix.dir }})
+    if: ${{ needs.prepare.outputs.strategy != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+      - uses: gmo-media/tofu-actions/setup-aws-credentials@v1
+        with:
+          aws_credentials: ${{ secrets.AWS_CREDENTIALS }}
+      - uses: gmo-media/tofu-actions/plan@v1
+        with:
+          dir: ${{ matrix.dir }}
+
+  plan-comment:
+    needs: [ prepare, plan ]
+    if: ${{ always() }}
+    name: Plan comment
+    runs-on: ubuntu-latest
+    steps:
+      - uses: gmo-media/tofu-actions/plan-comment@v1
