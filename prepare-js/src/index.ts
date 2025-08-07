@@ -7,10 +7,10 @@ interface Config {
   dirs: string[];
 }
 
-const readConfig = (): Config => {
-  const configFile = core.getInput('config')
-  const fileContent = fs.readFileSync(configFile, 'utf8')
-  return JSON.parse(fileContent)
+const readConfig = async (): Promise<Config> => {
+  const path = core.getInput('config')
+  const relativePath = path.startsWith('./') ? path : './' + path
+  return import(relativePath)
 }
 
 interface TerraformConfigInspect {
@@ -44,8 +44,8 @@ const getModuleSources = (dir: string): string[] => {
   return paths
 }
 
-const run = () => {
-  const config = readConfig()
+const run = async () => {
+  const config = await readConfig()
 
   // Read the tj-actions/changed-files output file
   const outputFile = '.github/outputs/all_changed_and_modified_files.txt';
@@ -76,4 +76,4 @@ const run = () => {
   core.setOutput('count', runDirs.length)
 }
 
-run();
+run().catch(console.error);

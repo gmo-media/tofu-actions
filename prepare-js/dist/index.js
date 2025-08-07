@@ -27249,10 +27249,10 @@ function requireCore () {
 
 var coreExports = requireCore();
 
-const readConfig = () => {
-    const configFile = coreExports.getInput('config');
-    const fileContent = fs.readFileSync(configFile, 'utf8');
-    return JSON.parse(fileContent);
+const readConfig = async () => {
+    const path = coreExports.getInput('config');
+    const relativePath = path.startsWith('./') ? path : './' + path;
+    return import(relativePath);
 };
 const inspectDir = (dir) => {
     const bin = coreExports.getInput('terraform-config-inspect');
@@ -27274,8 +27274,8 @@ const getModuleSources = (dir) => {
     console.log(`[terraform-config-inspect] ${dir} is dependent on ${paths}`);
     return paths;
 };
-const run = () => {
-    const config = readConfig();
+const run = async () => {
+    const config = await readConfig();
     // Read the tj-actions/changed-files output file
     const outputFile = '.github/outputs/all_changed_and_modified_files.txt';
     const fileContent = fs.readFileSync(outputFile, 'utf8').trim();
@@ -27302,5 +27302,5 @@ const run = () => {
     coreExports.setOutput('dirs', runDirs.join(' '));
     coreExports.setOutput('count', runDirs.length);
 };
-run();
+run().catch(console.error);
 //# sourceMappingURL=index.js.map
