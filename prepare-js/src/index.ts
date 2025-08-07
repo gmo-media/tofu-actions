@@ -8,9 +8,8 @@ interface Config {
 }
 
 const readConfig = async (): Promise<Config> => {
-  const path = core.getInput('config')
-  const relativePath = path.startsWith('./') ? path : './' + path
-  return import(relativePath)
+  const configPath = core.getInput('config')
+  return import(path.resolve(process.cwd(), configPath))
 }
 
 interface TerraformConfigInspect {
@@ -76,4 +75,7 @@ const run = async () => {
   core.setOutput('count', runDirs.length)
 }
 
-run().catch(console.error);
+run().catch(err => {
+  console.error(err)
+  process.exit(1)
+});

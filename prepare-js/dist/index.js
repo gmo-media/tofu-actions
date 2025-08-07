@@ -27250,9 +27250,8 @@ function requireCore () {
 var coreExports = requireCore();
 
 const readConfig = async () => {
-    const path = coreExports.getInput('config');
-    const relativePath = path.startsWith('./') ? path : './' + path;
-    return import(relativePath);
+    const configPath = coreExports.getInput('config');
+    return import(path.resolve(process.cwd(), configPath));
 };
 const inspectDir = (dir) => {
     const bin = coreExports.getInput('terraform-config-inspect');
@@ -27302,5 +27301,8 @@ const run = async () => {
     coreExports.setOutput('dirs', runDirs.join(' '));
     coreExports.setOutput('count', runDirs.length);
 };
-run().catch(console.error);
+run().catch(err => {
+    console.error(err);
+    process.exit(1);
+});
 //# sourceMappingURL=index.js.map
