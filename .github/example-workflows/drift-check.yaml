@@ -32,7 +32,8 @@ jobs:
         uses: gmo-media/tofu-actions/plan@v1
         with:
           dir: ${{ matrix.dir }}
-      - uses: gmo-media/tofu-actions/notify-drift@v1
+      - if: ${{ steps.plan.outputs.has-diff == 'true' }}
+        uses: gmo-media/tofu-actions/notify-drift@v1
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
