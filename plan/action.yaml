@@ -1,4 +1,4 @@
-name: Plan (${{ inputs.dir }})
+name: Plan
 
 inputs:
   dir:

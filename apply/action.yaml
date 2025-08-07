@@ -1,4 +1,4 @@
-name: Apply (${{ inputs.dir }})
+name: Apply
 
 inputs:
   dir:
