@@ -27267,11 +27267,12 @@ const inspectDir = (dir) => {
 };
 const getModuleSources = (dir) => {
     const tfConfig = inspectDir(dir);
-    const paths = Object.values(tfConfig.module_calls)
+    let paths = Object.values(tfConfig.module_calls)
         .map(m => m.source)
         // Resolve relative path to the project
         .map(moduleSrc => path.relative(process.cwd(), path.resolve(dir, moduleSrc)));
-    console.log(`[terraform-config-inspect] ${dir} is dependent on ${paths}`);
+    paths = [...new Set(paths)];
+    console.log(`[terraform-config-inspect] ${dir} is dependent on ${paths.join(', ')}`);
     return paths;
 };
 const run = async () => {
