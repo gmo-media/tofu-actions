@@ -1,0 +1,66 @@
+name: Plan comment
+
+inputs:
+  apply_workflow_id:
+    description: Workflow ID (filename) to apply plans
+    default: apply.yaml
+
+runs:
+  using: composite
+  steps:
+    - name: Download plan texts
+      uses: actions/download-artifact@v5
+      with:
+        pattern: plan-text-*
+        path: /tmp/
+        merge-multiple: true
+
+    - id: composite
+      name: Composite plan texts
+      shell: bash
+      run: |
+        echo "## Plan" > /tmp/comment.txt
+        echo 'To manually apply these plan(s), visit' >> /tmp/comment.txt
+        echo '${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}' >> /tmp/comment.txt
+        echo 'and fill `${{ github.run_id }}` to run_id parameter.' >> /tmp/comment.txt
+
+        for file in /tmp/plan-*.txt; do
+          dir_name="${file#/tmp/plan-}"
+          dir_name="${dir_name%.txt}"
+          dir_name="${dir_name//___/\/}"
+          
+          echo "### $dir_name" >> /tmp/comment.txt
+          echo '```' >> /tmp/comment.txt
+          cat $file >> /tmp/comment.txt
+          echo '```' >> /tmp/comment.txt
+        done
+        
+        echo 'comment<<EOF' >> $GITHUB_OUTPUT
+        cat /tmp/comment.txt >> $GITHUB_OUTPUT
+        echo 'EOF' >> $GITHUB_OUTPUT
+        LENGTH=$(wc -c /tmp/comment.txt | awk '{print $1}')
+        echo "length=$LENGTH" >> $GITHUB_OUTPUT
+
+    - if: ${{ steps.composite.outputs.length > 50000 }}
+      name: Add comment
+      uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
+      with:
+        message-id: plan-${{ github.event.pull_request.number }}
+        message-failure: Plan was not successful
+        message: |
+          ## Plan
+          Plan result was too long (> 50k chars) to include in PR comment.
+          Please check actions summary for more info.
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          To manually apply these plan(s), visit
+          ${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}
+          and fill `${{ github.run_id }}` to run_id parameter.
+
+    - if: ${{ steps.composite.outputs.length <= 50000 }}
+      name: Add comment
+      uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
+      with:
+        message-id: plan-${{ github.event.pull_request.number }}
+        message-failure: Plan was not successful
+        message: ${{ steps.composite.outputs.comment }}

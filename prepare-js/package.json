@@ -1,0 +1,43 @@
+{
+  "name": "typescript-action",
+  "description": "GitHub Actions TypeScript template",
+  "version": "0.0.0",
+  "author": "",
+  "type": "module",
+  "private": true,
+  "homepage": "https://github.com/actions/typescript-action",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/actions/typescript-action.git"
+  },
+  "bugs": {
+    "url": "https://github.com/actions/typescript-action/issues"
+  },
+  "keywords": [
+    "actions"
+  ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "package": "npx rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.11.1"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.6",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-typescript": "^12.1.4",
+    "@types/node": "^24.2.0",
+    "rollup": "^4.46.2",
+    "typescript": "^5.9.2"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "*"
+  }
+}

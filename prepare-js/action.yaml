@@ -1,0 +1,22 @@
+name: tofu-actions prepare-js
+description: Calculates directories to run based on changed files.
+
+inputs:
+  config:
+    description: Tofu actions config file
+    required: true
+  terraform-config-inspect:
+    description: Path to binary of terraform-config-inspect
+    default: terraform-config-inspect
+
+outputs:
+  strategy:
+    description: Strategy matrix JSON
+  dirs:
+    description: Directories to run separated by space
+  count:
+    description: Number of directories to run
+
+runs:
+  using: node20
+  main: dist/index.js

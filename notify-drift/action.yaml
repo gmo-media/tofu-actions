@@ -1,0 +1,62 @@
+name: Notify drift (${{ inputs.dir }})
+
+inputs:
+  dir:
+    description: Directory to run in
+    required: true
+  plan:
+    description: Plan string
+    required: true
+  webhook:
+    description: Slack incoming-webhook URL
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: escape
+      name: Escape plan output
+      env:
+        PLAN: ${{ inputs.plan }}
+      shell: bash
+      run: |
+        echo "$PLAN" | grep -E "^Plan: " | head -n 1 | jq -Rs '"*Plan Summary:*\n```\n\(.)```"' > /tmp/plan-escaped.txt
+        echo "plan=$(cat /tmp/plan-escaped.txt)" >> $GITHUB_OUTPUT
+
+    - name: Send Slack notification
+      uses: slackapi/slack-github-action@v2
+      with:
+        webhook: ${{ inputs.webhook }}
+        webhook-type: incoming-webhook
+        payload: |
+          text: "🚨 Infrastructure drift detected in ${{ inputs.dir }} environment"
+          blocks:
+            - type: "header"
+              text:
+                type: "plain_text"
+                text: "🚨 Infrastructure Drift Detected"
+                emoji: true
+            - type: "section"
+              fields:
+                - type: "mrkdwn"
+                  text: "*Environment:*\n${{ inputs.dir }}"
+                - type: "mrkdwn"
+                  text: "*Repository:*\n<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}>"
+                - type: "mrkdwn"
+                  text: "*Workflow Run:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+            - type: "section"
+              text:
+                type: "mrkdwn"
+                text: "*Action Required:*\nInfrastructure drift has been detected. Please review the changes and apply the plan if necessary."
+            - type: "section"
+              text:
+                type: "mrkdwn"
+                text: ${{ steps.escape.outputs.plan }}
+            - type: "actions"
+              elements:
+                - type: "button"
+                  text:
+                    type: "plain_text"
+                    text: "View Full Plan"
+                    emoji: true
+                  url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

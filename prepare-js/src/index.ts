@@ -1,0 +1,79 @@
+import * as core from '@actions/core'
+import * as fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import path from "node:path";
+
+interface Config {
+  dirs: string[];
+}
+
+const readConfig = (): Config => {
+  const configFile = core.getInput('config')
+  const fileContent = fs.readFileSync(configFile, 'utf8')
+  return JSON.parse(fileContent)
+}
+
+interface TerraformConfigInspect {
+  module_calls: {
+    [key: string]: {
+      name: string;
+      source: string;
+    }
+  }
+}
+
+const inspectDir = (dir: string): TerraformConfigInspect => {
+  const bin = core.getInput('terraform-config-inspect')
+  const res = spawnSync(bin, ['--json', dir])
+  if (res.error) {
+    throw res.error
+  }
+  if (res.status !== 0) {
+    throw new Error(`terraform-config-inspect exited with status ${res.status}, stdout: ${res.stdout.toString()}, stderr: ${res.stderr.toString()}`)
+  }
+  return JSON.parse(res.stdout.toString())
+}
+
+const getModuleSources = (dir: string): string[] => {
+  const tfConfig = inspectDir(dir)
+  const paths = Object.values(tfConfig.module_calls)
+    .map(m => m.source)
+    // Resolve relative path to the project
+    .map(moduleSrc => path.resolve(dir, moduleSrc))
+  console.log(`[terraform-config-inspect] ${dir} is dependent on ${paths}`)
+  return paths
+}
+
+const run = () => {
+  const config = readConfig()
+
+  // Read the tj-actions/changed-files output file
+  const outputFile = '.github/outputs/all_changed_and_modified_files.txt';
+  const fileContent = fs.readFileSync(outputFile, 'utf8').trim();
+  const changedFiles = fileContent ? fileContent.split(' ') : [];
+  console.log(`${changedFiles.length} files were changed, calculating which CI to run...`)
+
+  // Determine which CI to run
+  const hasPaths = (matchers: RegExp[]) => {
+    for (const matcher of matchers) {
+      if (changedFiles.some(file => matcher.test(file))) {
+        return true;
+      }
+    }
+    return false;
+  }
+  const runDirs = config.dirs
+    .filter(dir => hasPaths([
+      new RegExp(`^${dir}/[^/]+$`),
+      ...getModuleSources(dir)
+        .map(src => new RegExp(`${src}/[^/]+$`)),
+    ]))
+
+  console.log(`Running on directories: ${runDirs}`)
+  const strategy = runDirs.map(dir => ({ dir }))
+  core.setOutput('strategy', JSON.stringify(strategy))
+  core.setOutput('dirs', runDirs.join(' '))
+  core.setOutput('count', runDirs.length)
+}
+
+run();

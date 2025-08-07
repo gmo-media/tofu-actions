@@ -1,0 +1,94 @@
+name: Plan (${{ inputs.dir }})
+
+inputs:
+  dir:
+    description: Directory to run in
+    required: true
+  apply_workflow_id:
+    description: Workflow ID (filename) to apply plans
+    default: apply.yaml
+
+outputs:
+  plan:
+    description: Plan string
+    value: ${{ steps.plan.outputs.plan }}
+  has-diff:
+    description: Plan has diff
+    value: ${{ steps.plan.outputs.has-diff }}
+
+runs:
+  using: composite
+  steps:
+    - working-directory: ${{ inputs.dir }}
+      shell: bash
+      run: tofu init --reconfigure
+
+    - working-directory: ${{ inputs.dir }}
+      shell: bash
+      run: tofu validate
+
+    - name: Sanitize artifact name
+      id: artifact-name
+      shell: bash
+      run: |
+        DIR="${{ inputs.dir }}"
+        NAME="${DIR//\//___}"
+        echo "name=$NAME" >> $GITHUB_OUTPUT
+
+    - id: plan
+      name: Plan
+      working-directory: ${{ inputs.dir }}
+      shell: bash
+      run: |
+        set -o pipefail
+
+        set +o pipefail
+        tofu plan -concise -detailed-exitcode -out /tmp/tofu.plan | tee /tmp/plan-raw.txt
+        PLAN_EXIT_CODE=${PIPESTATUS[0]}
+        set -o pipefail
+        # Exit code 1 means execution error, so fail the step
+        if [ $PLAN_EXIT_CODE -eq 1 ]; then
+          exit 1
+        fi
+
+        # Remove ansi colors
+        </tmp/plan-raw.txt sed -e 's/\x1b\[[0-9;]*m//g' \
+          | grep -v -E "OpenTofu used the selected providers to generate the following execution|Resource actions are indicated with the following symbols" \
+          | grep -v -E "Acquiring state lock|Reading|Still reading|Read complete after" \
+          | grep -v -E "OpenTofu has compared your real infrastructure against your configuration and|found no differences, so no changes are needed|Releasing state lock" \
+          | grep -v -E "─────────────────────────────────────────────────────────────────────────────" \
+          | grep -v -E "Saved the plan to|To perform exactly these actions, run the following command to apply|tofu apply \"/tmp/tofu.plan\"" \
+          > /tmp/plan.txt
+        cp /tmp/plan.txt /tmp/plan-${{ steps.artifact-name.outputs.name }}.txt
+
+        echo 'plan<<EOF' >> $GITHUB_OUTPUT
+        cat /tmp/plan.txt >> $GITHUB_OUTPUT
+        echo 'EOF' >> $GITHUB_OUTPUT
+
+        echo '### Plan (${{ inputs.dir }})' >> $GITHUB_STEP_SUMMARY
+        echo '```plaintext' >> $GITHUB_STEP_SUMMARY
+        cat /tmp/plan.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo 'To manually apply this plan, visit' >> $GITHUB_STEP_SUMMARY
+        echo '${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}' >> $GITHUB_STEP_SUMMARY
+        echo 'and fill `${{ github.run_id }}` to run_id parameter.' >> $GITHUB_STEP_SUMMARY
+
+        # NOTE: For some reason, opentofu never exits with exit code 2 (which means diff was detected),
+        # so we're checking the "No changes" string in /tmp/plan-raw.txt to detect drift for now.
+        echo "tofu plan exit code: $PLAN_EXIT_CODE"
+        if grep -q "No changes. Your infrastructure matches the configuration." /tmp/plan-raw.txt; then
+          echo "has-diff=false" >> $GITHUB_OUTPUT
+        else
+          echo "has-diff=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload plan text
+      uses: actions/upload-artifact@v4
+      with:
+        name: plan-text-${{ steps.artifact-name.outputs.name }}
+        path: /tmp/plan-${{ steps.artifact-name.outputs.name }}.txt
+    - name: Upload plan file
+      uses: actions/upload-artifact@v4
+      with:
+        name: plan-file-${{ steps.artifact-name.outputs.name }}
+        path: /tmp/tofu.plan

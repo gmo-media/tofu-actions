@@ -1,0 +1,40 @@
+name: Apply (${{ inputs.dir }})
+
+inputs:
+  dir:
+    description: Directory to run in
+    required: true
+  run-id:
+    description: Actions run ID where plan was generated
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - working-directory: ${{ inputs.dir }}
+      shell: bash
+      run: tofu init --reconfigure
+
+    - working-directory: ${{ inputs.dir }}
+      shell: bash
+      run: tofu validate
+
+    - name: Sanitize artifact name
+      id: artifact-name
+      shell: bash
+      run: |
+        DIR="${{ inputs.dir }}"
+        NAME="${DIR//\//___}"
+        echo "name=$NAME" >> $GITHUB_OUTPUT
+    - name: Download plan
+      uses: actions/download-artifact@v4
+      with:
+        github-token: ${{ github.token }}
+        run-id: ${{ inputs.run-id }}
+        name: plan-file-${{ steps.artifact-name.outputs.name }}
+        path: /tmp/
+
+    - name: Apply
+      working-directory: ${{ inputs.dir }}
+      shell: bash
+      run: tofu apply /tmp/tofu.plan

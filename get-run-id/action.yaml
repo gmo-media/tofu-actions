@@ -1,0 +1,37 @@
+name: Get last run ID in the PR
+
+inputs:
+  pr-plan-workflow-id:
+    description: Workflow ID (filename) of the PR plan workflow
+    default: ci.yaml
+
+outputs:
+  run-id:
+    description: Last run ID in the PR
+    value: ${{ steps.get-run-id.outputs.run-id }}
+
+runs:
+  using: composite
+  steps:
+    - id: get-run-id
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // Use listWorkflowRuns with workflow_id instead of listWorkflowRunsForRepo
+          const { data: runs } = await github.rest.actions.listWorkflowRuns({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: '${{ inputs.pr-plan-workflow-id }}',
+            branch: context.payload.pull_request.head.ref,
+            status: 'success',
+            per_page: 1
+          });
+          
+          if (runs.workflow_runs.length === 0) {
+            core.setFailed('No successful CI workflow runs found for this PR');
+            return;
+          }
+          
+          const latestRun = runs.workflow_runs[0];
+          console.log(`Found latest CI run: ${latestRun.id} from ${latestRun.created_at}`);
+          core.setOutput('run-id', latestRun.id);
