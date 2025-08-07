@@ -21,7 +21,7 @@ on:
 
 env:
   AWS_REGION: ap-northeast-1
-  TOFU_VERSION: 1.10.4
+  TOFU_VERSION: 1.10.5
 
 jobs:
   apply:

@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: false
 
+env:
+  AWS_REGION: ap-northeast-1
+  TOFU_VERSION: 1.10.5
+
 jobs:
   prepare:
     runs-on: ubuntu-latest

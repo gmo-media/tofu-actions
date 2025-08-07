@@ -7,6 +7,10 @@ on:
   schedule:
     - cron: "0 0 * * *"
 
+env:
+  AWS_REGION: ap-northeast-1
+  TOFU_VERSION: 1.10.5
+
 jobs:
   drift-check:
     strategy:
