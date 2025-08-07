@@ -41,7 +41,7 @@ runs:
 
     - name: Calculate directories to run
       id: prepare
-      uses: ./prepare-js
+      uses: gmo-media/tofu-actions/prepare-js@v1
       with:
         config: ${{ inputs.config }}
         terraform-config-inspect: /tmp/terraform-config-inspect
