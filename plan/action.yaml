@@ -74,9 +74,9 @@ runs:
         echo 'and fill `${{ github.run_id }}` to run_id parameter.' >> $GITHUB_STEP_SUMMARY
 
         # NOTE: For some reason, opentofu never exits with exit code 2 (which means diff was detected),
-        # so we're checking the "No changes" string in /tmp/plan-raw.txt to detect drift for now.
+        # so we're checking the "No changes" string in /tmp/plan.txt to detect drift for now.
         echo "tofu plan exit code: $PLAN_EXIT_CODE"
-        if grep -q "No changes. Your infrastructure matches the configuration." /tmp/plan-raw.txt; then
+        if grep -q "No changes. Your infrastructure matches the configuration." /tmp/plan.txt; then
           echo "has-diff=false" >> $GITHUB_OUTPUT
         else
           echo "has-diff=true" >> $GITHUB_OUTPUT
