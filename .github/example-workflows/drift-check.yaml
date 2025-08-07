@@ -12,13 +12,23 @@ env:
   TOFU_VERSION: 1.10.5
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: prepare
+        uses: gmo-media/tofu-actions/prepare@v1
+        with:
+          force-all-changed: 'true'
+    outputs:
+      strategy: ${{ steps.prepare.outputs.strategy }}
+
   drift-check:
+    needs: [ prepare ]
     strategy:
       fail-fast: false
       matrix:
-        dir:
-          - dev
-          - prod
+        include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

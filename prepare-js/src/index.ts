@@ -47,9 +47,7 @@ const getModuleSources = (dir: string): string[] => {
   return paths
 }
 
-const run = async () => {
-  const config = await readConfig()
-
+const calculateRunDirs = (config: Config): string[] => {
   // Read the tj-actions/changed-files output file
   const outputFile = '.github/outputs/all_changed_and_modified_files.txt';
   const fileContent = fs.readFileSync(outputFile, 'utf8').trim();
@@ -65,12 +63,22 @@ const run = async () => {
     }
     return false;
   }
-  const runDirs = config.dirs
+  return config.dirs
     .filter(dir => hasPaths([
       new RegExp(`^${dir}/[^/]+$`),
       ...getModuleSources(dir)
         .map(src => new RegExp(`${src}/[^/]+$`)),
     ]))
+}
+
+const run = async () => {
+  const config = await readConfig()
+
+  const forceAllChanged = core.getInput('force-all-changed') === 'true'
+  if (forceAllChanged) {
+    console.log(`[prepare] force-all-changed flag is on. Short-circuiting and outputting all paths as 'changed'...`)
+  }
+  const runDirs = forceAllChanged ? config.dirs : calculateRunDirs(config)
 
   console.log(`Running on directories: ${runDirs}`)
   const strategy = runDirs.map(dir => ({ dir }))

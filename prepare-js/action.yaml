@@ -8,6 +8,11 @@ inputs:
   terraform-config-inspect:
     description: Path to binary of terraform-config-inspect
     default: terraform-config-inspect
+  force-all-changed:
+    description: >-
+      If 'true', outputs all configured paths as 'changed'.
+      Useful for drift checking.
+    default: 'false'
 
 outputs:
   strategy:

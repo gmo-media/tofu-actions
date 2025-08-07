@@ -4,6 +4,11 @@ inputs:
   config:
     description: Tofu actions config file
     default: .github/tofu-actions-config.js
+  force-all-changed:
+    description: >-
+      If 'true', outputs all configured paths as 'changed'.
+      Useful for drift checking.
+    default: 'false'
 
 outputs:
   strategy:
@@ -45,3 +50,4 @@ runs:
       with:
         config: ${{ inputs.config }}
         terraform-config-inspect: /tmp/terraform-config-inspect
+        force-all-changed: ${{ inputs.force-all-changed }}
