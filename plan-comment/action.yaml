@@ -36,7 +36,7 @@ runs:
           echo '```' >> /tmp/comment.txt
           cat $file >> /tmp/comment.txt
           echo '```' >> /tmp/comment.txt
-        done < <(find . -name '/tmp/plan-*.txt' -print0)
+        done < <(find /tmp -name 'plan-*.txt' -print0)
         
         if [ "$found" = false ]; then
           echo 'No directories were processed.' >> /tmp/comment.txt
