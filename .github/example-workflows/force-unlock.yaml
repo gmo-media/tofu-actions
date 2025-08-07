@@ -24,7 +24,7 @@ env:
   TOFU_VERSION: 1.10.5
 
 jobs:
-  apply:
+  force-unlock:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,4 +37,4 @@ jobs:
       - working-directory: ${{ inputs.dir }}
         run: tofu init --reconfigure
       - working-directory: ${{ inputs.dir }}
-        run: tofu force-unlock -force ${{ inputs.lock_id }}
+        run: tofu force-unlock -force ${{ inputs.lock-id }}
