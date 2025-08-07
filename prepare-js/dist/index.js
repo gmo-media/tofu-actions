@@ -27251,7 +27251,8 @@ var coreExports = requireCore();
 
 const readConfig = async () => {
     const configPath = coreExports.getInput('config');
-    return import(path.resolve(process.cwd(), configPath));
+    const module = await import(path.resolve(process.cwd(), configPath));
+    return module.default;
 };
 const inspectDir = (dir) => {
     const bin = coreExports.getInput('terraform-config-inspect');

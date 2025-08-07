@@ -9,7 +9,8 @@ interface Config {
 
 const readConfig = async (): Promise<Config> => {
   const configPath = core.getInput('config')
-  return import(path.resolve(process.cwd(), configPath))
+  const module = await import(path.resolve(process.cwd(), configPath))
+  return module.default
 }
 
 interface TerraformConfigInspect {
