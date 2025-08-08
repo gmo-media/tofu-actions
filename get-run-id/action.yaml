@@ -14,7 +14,7 @@ runs:
   using: composite
   steps:
     - id: get-run-id
-      uses: actions/github-script@v7
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
       with:
         script: |
           // Use listWorkflowRuns with workflow_id instead of listWorkflowRunsForRepo

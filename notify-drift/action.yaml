@@ -24,7 +24,7 @@ runs:
         echo "plan=$(cat /tmp/plan-escaped.txt)" >> $GITHUB_OUTPUT
 
     - name: Send Slack notification
-      uses: slackapi/slack-github-action@v2
+      uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2
       with:
         webhook: ${{ inputs.webhook }}
         webhook-type: incoming-webhook

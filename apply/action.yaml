@@ -27,7 +27,7 @@ runs:
         NAME="${DIR//\//___}"
         echo "name=$NAME" >> $GITHUB_OUTPUT
     - name: Download plan
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
         github-token: ${{ github.token }}
         run-id: ${{ inputs.run-id }}
