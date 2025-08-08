@@ -6,10 +6,11 @@ on:
       strategy:
         description: Semver release strategy
         type: choice
+        default: patch
         options:
-          - major
-          - minor
           - patch
+          - minor
+          - major
 
 jobs:
   update-major-tag:
