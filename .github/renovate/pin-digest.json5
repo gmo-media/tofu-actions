@@ -5,6 +5,7 @@
       "description": "Do not pin digests of own action",
       "matchManagers": ["github-actions"],
       "matchDepNames": [
+        "gmo-media/tofu-actions",
         "gmo-media/tofu-actions/*",
       ],
       "pinDigests": false,
