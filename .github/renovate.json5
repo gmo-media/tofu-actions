@@ -7,7 +7,8 @@
     ':semanticCommits',
     'helpers:pinGitHubActionDigests',
     'github>gmo-media/tofu-actions//.github/renovate/auto-merge.json5',
-    'github>gmo-media/tofu-actions//.github/renovate/minimum-release-age.json5'
+    'github>gmo-media/tofu-actions//.github/renovate/minimum-release-age.json5',
+    'github>gmo-media/tofu-actions//.github/renovate/pin-digests.json5',
   ],
   platform: 'github',
   platformAutomerge: true,
