@@ -1,0 +1,67 @@
+name: Create new tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      strategy:
+        description: Semver release strategy
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+jobs:
+  update-major-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Git config
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Tag
+        run: |
+          # Modified code from https://stackoverflow.com/a/51728322
+          # Get the highest tag number
+          VERSION=$(git describe --abbrev=0 --tags --match 'v*.*.*')
+          ORIG_VERSION="$VERSION"
+
+          # Get number parts
+          MAJOR="${VERSION%%.*}"; VERSION="${VERSION#*.}"
+          MINOR="${VERSION%%.*}"; VERSION="${VERSION#*.}"
+          PATCH="${VERSION%%.*}"; VERSION="${VERSION#*.}"
+    
+          # Increase version
+          STRATEGY="${{ inputs.strategy }}"
+          if [ "$STRATEGY" = "patch" ]; then
+            PATCH=$((PATCH+1))
+          elif [ "$STRATEGY" = "minor" ]; then
+            MINOR=$((MINOR+1))
+            PATCH=0
+          elif [ "$STRATEGY" = "major" ]; then
+            MAJOR=$((MAJOR+1))
+            MINOR=0
+            PATCH=0
+          else
+            echo "Unknown strategy: $STRATEGY"
+            exit 1
+          fi
+          NEW_TAG="$MAJOR.$MINOR.$PATCH"
+          echo "Calculating new tag... $ORIG_VERSION => $NEW_TAG"
+    
+          # Get current hash and see if it already has a tag
+          GIT_COMMIT=$(git rev-parse HEAD)
+          if git describe --contains "$GIT_COMMIT" > /dev/null 2>&1; then
+            echo "HEAD is already tagged, are you sure this is the right commit?"
+            exit 1
+          fi
+    
+          # Only tag if no tag already (would be better if the git describe command above could have a silent option)
+          echo "Tagging commit $GIT_COMMIT with $NEW_TAG"
+          git tag "$NEW_TAG"
+
+          echo "Pushing tag $NEW_TAG"
+          git push origin "$NEW_TAG"

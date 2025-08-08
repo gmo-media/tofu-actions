@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - v*.*.*
+    branches-ignore:
+      - '**'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+
+  update-major-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: tag
+        run: |
+          # GITHUB_REF -> refs/tags/v1.2.3
+          # ${GITHUB_REF:10} -> v1.2.3
+          tag="${GITHUB_REF:10}"
+          echo "tag=${tag}" >> $GITHUB_OUTPUT
+          major="${tag%%.*}"
+          echo "major=${major}" >> $GITHUB_OUTPUT
+      - name: Git config
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Tag new target
+        run: git tag -f ${{ steps.tag.outputs.major }} ${{ github.ref }}
+      - name: Push new tag
+        run: git push origin ${{ steps.tag.outputs.major }} --force
