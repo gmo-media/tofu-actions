@@ -1,0 +1,9 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "packageRules": [
+    {
+      "description": "Defaults to 7 days of stability",
+      "minimumReleaseAge": "7 days",
+    },
+  ]
+}

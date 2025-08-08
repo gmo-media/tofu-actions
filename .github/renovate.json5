@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    'config:recommended',
+    ':disableRateLimiting',
+    ':dependencyDashboard',
+    ':semanticCommits',
+    'helpers:pinGitHubActionDigests',
+    'github>gmo-media/tofu-actions//.github/renovate/auto-merge.json5',
+    'github>gmo-media/tofu-actions//.github/renovate/minimum-release-age.json5'
+  ],
+  platform: 'github',
+  platformAutomerge: true,
+  automergeType: 'pr',
+  onboarding: false,
+  dependencyDashboardTitle: 'Renovate Dashboard 🤖',
+  suppressNotifications: [
+    'prIgnoreNotification',
+  ],
+  branchConcurrentLimit: 0,
+  prConcurrentLimit: 0,
+}
