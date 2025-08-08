@@ -1,4 +1,4 @@
-# 手動applyを行う
+# Apply manually
 name: Apply
 run-name: Apply (${{ inputs.dir }})
 
@@ -13,7 +13,6 @@ on:
         options:
           - dev
           - prod
-          - ...
       run-id:
         description: Actions run ID where plan was generated
         type: string

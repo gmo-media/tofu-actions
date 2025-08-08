@@ -1,4 +1,4 @@
-# 手動planを行う
+# Plan manually
 name: Plan
 run-name: Plan (${{ inputs.dir }})
 
@@ -13,7 +13,6 @@ on:
         options:
           - dev
           - prod
-          - ...
 
 env:
   AWS_REGION: ap-northeast-1

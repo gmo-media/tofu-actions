@@ -1,4 +1,4 @@
-# PRでplanを行う
+# Plan on pull requests
 name: CI
 
 on:

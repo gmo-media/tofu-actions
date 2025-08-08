@@ -1,4 +1,4 @@
-# マージ後にapplyを行う
+# Apply automatically after merging pull requests
 name: Auto apply
 
 on:

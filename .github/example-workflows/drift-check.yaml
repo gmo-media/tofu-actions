@@ -1,4 +1,4 @@
-# Drift checkを行う
+# Run drift checks manually or on cron
 name: Drift Check
 
 on:
