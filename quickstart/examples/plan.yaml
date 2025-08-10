@@ -1,0 +1,21 @@
+# Plan manually
+name: Plan
+run-name: Plan (${{ inputs.dir }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      dir:
+        description: Directory to run in
+        type: choice
+        default: dev
+        options:
+          - dev
+          - prod
+
+jobs:
+  plan:
+    uses: gmo-media/tofu-actions/quickstart/plan.yaml@v2
+    with:
+      aws-role: arn:aws:iam::0123456789:role/my-plan-role-name
+      dir: ${{ inputs.dir }}

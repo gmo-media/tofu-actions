@@ -1,0 +1,26 @@
+# Apply manually
+name: Apply
+run-name: Apply (${{ inputs.dir }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      dir:
+        description: Directory to run in
+        type: choice
+        default: dev
+        options:
+          - dev
+          - prod
+      run-id:
+        description: Actions run ID where plan was generated
+        type: string
+        required: true
+
+jobs:
+  apply:
+    uses: gmo-media/tofu-actions/quickstart/apply.yaml@v2
+    with:
+      aws-role: arn:aws:iam::0123456789:role/my-apply-role-name
+      dir: ${{ inputs.dir }}
+      run-id: ${{ inputs.run-id }}

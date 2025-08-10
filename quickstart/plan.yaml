@@ -1,0 +1,55 @@
+# Plan manually
+name: Plan
+run-name: Plan (${{ inputs.dir }})
+
+on:
+  workflow_call:
+    inputs:
+      auth-mode:
+        description: Authentication mode (aws-oidc or aws-cred, aws-cred is deprecated)
+        type: string
+        default: aws-oidc
+      aws-cred:
+        description: AWS credentials (required when auth-mode is aws-cred)
+        type: string
+      aws-region:
+        description: AWS region (required when auth-mode is aws-oidc)
+        type: string
+        default: ap-northeast-1
+      aws-role:
+        description: >-
+          AWS role to assume (required when auth-mode is aws-oidc)
+          e.g. arn:aws:iam::0123456789:role/my-plan-role-name
+        type: string
+
+      dir:
+        description: Directory to run in
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - if: ${{ inputs.auth-mode == 'aws-cred' }}
+        uses: gmo-media/tofu-actions/setup-aws-credentials@v2
+        with:
+          aws_credentials: ${{ inputs.aws-cred }}
+      - if: ${{ inputs.auth-mode == 'aws-oidc' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ inputs.aws-region }}
+          role-to-assume: ${{ inputs.aws-role }}
+
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version_file: .opentofu-version
+
+      - uses: gmo-media/tofu-actions/plan@v2
+        with:
+          dir: ${{ inputs.dir }}
