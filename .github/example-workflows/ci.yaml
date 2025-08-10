@@ -81,3 +81,31 @@ jobs:
         with:
           dir: ${{ matrix.dir }}
           run-id: ${{ needs.prepare.outputs.merged-pr-run-id }}
+
+  drift-check:
+    needs: [ prepare ]
+    name: Drift check (${{ matrix.dir }})
+    if: ${{ github.event_name == 'push' && needs.prepare.outputs.strategy != '[]' && needs.prepare.outputs.merged-pr-run-id == '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version_file: .opentofu-version
+      - uses: gmo-media/tofu-actions/setup-aws-credentials@v2
+        with:
+          aws_credentials: ${{ secrets.AWS_CREDENTIALS }}
+      - id: plan
+        uses: gmo-media/tofu-actions/plan@v2
+        with:
+          dir: ${{ matrix.dir }}
+      - if: ${{ steps.plan.outputs.has-diff == 'true' }}
+        uses: gmo-media/tofu-actions/notify-drift@v2
+        with:
+          dir: ${{ matrix.dir }}
+          plan: ${{ steps.plan.outputs.plan }}
+          webhook: "https://hooks.slack.com/..."
