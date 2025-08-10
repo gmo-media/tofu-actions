@@ -1,6 +1,10 @@
 name: Prepare
 
 inputs:
+  github-token:
+    description: GitHub token for API access (defaults to github.token)
+    default: ${{ github.token }}
+
   config:
     description: Tofu actions config file
     default: .github/tofu-actions-config.js
@@ -9,6 +13,11 @@ inputs:
       If 'true', outputs all configured paths as 'changed'.
       Useful for drift checking.
     default: 'false'
+
+  workflow-id:
+    description: >-
+      Workflow ID (e.g. ci.yaml), used to retrieve the latest run ID in the associated PR.
+      Defaults to the current workflow ID.
 
 outputs:
   strategy:
@@ -20,6 +29,13 @@ outputs:
   count:
     description: Run dirs count
     value: ${{ steps.prepare.outputs.count }}
+
+  merged-pr-number:
+    description: Associated merged PR number with current HEAD (if any)
+    value: ${{ steps.prepare.outputs.merged-pr-number }}
+  merged-pr-run-id:
+    description: Latest run ID of the workflow in the associated PR (if any)
+    value: ${{ steps.prepare.outputs.merged-pr-run-id }}
 
 runs:
   using: composite
@@ -48,6 +64,8 @@ runs:
       id: prepare
       uses: gmo-media/tofu-actions/prepare-js@v1
       with:
+        github-token: ${{ inputs.github-token }}
         config: ${{ inputs.config }}
         terraform-config-inspect: /tmp/terraform-config-inspect
         force-all-changed: ${{ inputs.force-all-changed }}
+        workflow-id: ${{ inputs.workflow-id }}

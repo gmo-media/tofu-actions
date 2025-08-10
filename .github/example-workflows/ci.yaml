@@ -1,7 +1,10 @@
-# Plan on pull requests
+# Plan and apply on pull requests
 name: CI
 
 on:
+  push:
+    branches:
+      - master
   pull_request:
 
 concurrency:
@@ -30,11 +33,12 @@ jobs:
         uses: gmo-media/tofu-actions/prepare@v1
     outputs:
       strategy: ${{ steps.prepare.outputs.strategy }}
+      merged-pr-run-id: ${{ steps.prepare.outputs.merged-pr-run-id }}
 
   plan:
     needs: [ prepare ]
     name: Plan (${{ matrix.dir }})
-    if: ${{ needs.prepare.outputs.strategy != '[]' }}
+    if: ${{ github.event_name == 'pull_request' && needs.prepare.outputs.strategy != '[]' }}
     strategy:
       fail-fast: false
       matrix:
@@ -59,3 +63,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: gmo-media/tofu-actions/plan-comment@v1
+
+  apply:
+    needs: [ prepare ]
+    name: Apply (${{ matrix.dir }})
+    if: ${{ github.event_name == 'push' && needs.prepare.outputs.strategy != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+      - uses: gmo-media/tofu-actions/setup-aws-credentials@v1
+        with:
+          aws_credentials: ${{ secrets.AWS_CREDENTIALS }}
+      - uses: gmo-media/tofu-actions/apply@v1
+        with:
+          dir: ${{ matrix.dir }}
+          run-id: ${{ needs.prepare.outputs.merged-pr-run-id }}
