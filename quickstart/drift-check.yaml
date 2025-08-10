@@ -1,0 +1,77 @@
+# Run drift checks manually or on cron
+name: Drift Check
+
+on:
+  workflow_call:
+    inputs:
+      auth-mode:
+        description: Authentication mode (aws-oidc or aws-cred, aws-cred is deprecated)
+        type: string
+        default: aws-oidc
+      aws-cred:
+        description: AWS credentials (required when auth-mode is aws-cred)
+        type: string
+      aws-region:
+        description: AWS region (required when auth-mode is aws-oidc)
+        type: string
+        default: ap-northeast-1
+      aws-role:
+        description: >-
+          AWS role to assume (required when auth-mode is aws-oidc)
+          e.g. arn:aws:iam::0123456789:role/my-plan-role-name
+        type: string
+
+      drift-notify-webhook:
+        description: Slack webhook URL for drift notification
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: prepare
+        uses: gmo-media/tofu-actions/prepare@v2
+        with:
+          force-all-changed: 'true'
+    outputs:
+      strategy: ${{ steps.prepare.outputs.strategy }}
+
+  drift-check:
+    needs: [ prepare ]
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
+    runs-on: ubuntu-latest
+    steps:
+      - if: ${{ inputs.auth-mode == 'aws-cred' }}
+        uses: gmo-media/tofu-actions/setup-aws-credentials@v2
+        with:
+          aws_credentials: ${{ inputs.aws-cred }}
+      - if: ${{ inputs.auth-mode == 'aws-oidc' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ inputs.aws-region }}
+          role-to-assume: ${{ inputs.aws-role }}
+
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version_file: .opentofu-version
+
+      - id: plan
+        uses: gmo-media/tofu-actions/plan@v2
+        with:
+          dir: ${{ matrix.dir }}
+      - if: ${{ steps.plan.outputs.has-diff == 'true' }}
+        uses: gmo-media/tofu-actions/notify-drift@v2
+        with:
+          dir: ${{ matrix.dir }}
+          plan: ${{ steps.plan.outputs.plan }}
+          webhook: ${{ inputs.drift-notify-webhook }}

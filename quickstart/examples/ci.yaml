@@ -1,0 +1,16 @@
+# Plan and apply on pull requests
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  ci:
+    uses: gmo-media/tofu-actions/quickstart/ci.yaml@v2
+    with:
+      aws-plan-role: arn:aws:iam::0123456789:role/my-plan-role-name
+      aws-apply-role: arn:aws:iam::0123456789:role/my-apply-role-name
+      drift-notify-webhook: "https://hooks.slack.com/..."
