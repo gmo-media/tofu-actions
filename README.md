@@ -1,22 +1,22 @@
 # tofu-actions
 
-gmo-media/tofu-actions is a collection of reusable GitHub Actions for OpenTofu.
-While being a simpler alternative to [suzuki-shunsuke/tfaction](https://github.com/suzuki-shunsuke/tfaction),
-gmo-media/tofu-actions is focused on our use-cases:
+A collection of reusable GitHub Actions and workflows for OpenTofu that makes infrastructure automation simple.
+This project provides a lighter alternative to [suzuki-shunsuke/tfaction](https://github.com/suzuki-shunsuke/tfaction),
+tailored for specific needs:
 
-- Only supports OpenTofu (and not Terraform) for now
-- Monorepo support (multiple tofu directories exist in one repository)
-- local-path modules within the repository
+- Built exclusively for OpenTofu (Terraform not supported yet)
+- Works great with monorepos (manage multiple infrastructure directories in one repository)
+- Supports local modules within your repository
 
-If you want to do more advanced stuff or want to rely on battle-tested solutions,
-consider a more maintained solution like suzuki-shunsuke/tfaction.
+For more advanced features or battle-tested solutions,
+we recommend checking out suzuki-shunsuke/tfaction.
 
-## Installation
+## Getting Started
 
-### Configuration file
+### Setting up your configuration
 
-Put `.github/tofu-actions-config.js` in the repository and fill in Terraform directory names within the repository.
-Do NOT prefix paths with `./` nor suffix with `/`.
+Create a file called `.github/tofu-actions-config.js` in your repository and list your OpenTofu directories.
+You must *not* put `./` at the start or `/` at the end.
 
 ```js
 export default {
@@ -27,15 +27,15 @@ export default {
 }
 ```
 
-### Workflow files (Quickstart)
+### Adding workflow files (Quick start)
 
-Copy files inside `.github/example-workflows/` and put them under `.github/workflows` of your repository.
+Copy the workflow examples from `.github/example-workflows/` to your repository's `.github/workflows` directory.
 
-- Add `.opentofu-version` file to repository root.
-- Modify workflow_dispatch's `dir` options and its default, if needed.
+- Create an `.opentofu-version` file in your repository root
+- Update the `dir` options in workflow_dispatch to match your needs
 
-### About quickstart workflows
+### Understanding the quick start workflows
 
-`.github/workflows/quickstart-*.yaml` files are self-contained workflows with `workflow_call` entry-points.
-These reusable workflows let you start quickly with minimal boiler-plates.
-If you need to customize these workflows, copy the contents of each workflow and modify them to fit your needs.
+The `.github/workflows/quickstart-*.yaml` files are ready-to-use opinionated workflows that you can call from other workflows.
+They help you get started quickly without writing much code.
+If you need something more custom, copy the workflow content and adjust it to your needs.
