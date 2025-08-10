@@ -29,7 +29,13 @@ export default {
 
 ### Workflow files (Quickstart)
 
-You can copy files inside `quickstart/examples/` and put them under `.github/workflows` of your repository.
+Copy files inside `.github/example-workflows/` and put them under `.github/workflows` of your repository.
 
 - Add `.opentofu-version` file to repository root.
 - Modify workflow_dispatch's `dir` options and its default, if needed.
+
+### About quickstart workflows
+
+`.github/workflows/quickstart-*.yaml` files are self-contained workflows with `workflow_call` entry-points.
+These reusable workflows let you start quickly with minimal boiler-plates.
+If you need to customize these workflows, copy the contents of each workflow and modify them to fit your needs.
