@@ -63,7 +63,7 @@ jobs:
   apply:
     needs: [ prepare ]
     name: Apply (${{ matrix.dir }})
-    if: ${{ github.event_name == 'push' && needs.prepare.outputs.strategy != '[]' }}
+    if: ${{ github.event_name == 'push' && needs.prepare.outputs.strategy != '[]' && needs.prepare.outputs.merged-pr-run-id != '' }}
     strategy:
       fail-fast: false
       matrix:
