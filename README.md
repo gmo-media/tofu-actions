@@ -2,7 +2,7 @@
 
 gmo-media/tofu-actions is a collection of reusable GitHub Actions for OpenTofu.
 While being a simpler alternative to [suzuki-shunsuke/tfaction](https://github.com/suzuki-shunsuke/tfaction),
-gmo-media/tofu-actions is focused to our use-cases:
+gmo-media/tofu-actions is focused on our use-cases:
 
 - Only supports OpenTofu (and not Terraform) for now
 - Monorepo support (multiple tofu directories exist in one repository)
