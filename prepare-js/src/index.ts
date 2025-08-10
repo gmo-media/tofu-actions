@@ -56,19 +56,27 @@ const calculateRunDirs = (config: Config): string[] => {
   console.log(`[prepare] ${changedFiles.length} files were changed, calculating which CI to run...`)
 
   // Determine which CI to run
-  const hasPaths = (matchers: RegExp[]) => {
-    for (const matcher of matchers) {
-      if (changedFiles.some(file => matcher.test(file))) {
+  const isDirectChildPath = (prefix: string, filePath: string): boolean => {
+    if (prefix.length === 0 || !filePath.startsWith(`${prefix}/`)) {
+      return false;
+    }
+    const relativePath = filePath.slice(prefix.length + 1);
+    return relativePath.length > 0 && !relativePath.includes('/');
+  }
+  
+  const hasPaths = (prefixes: string[]) => {
+    for (const prefix of prefixes) {
+      if (changedFiles.some(file => isDirectChildPath(prefix, file))) {
         return true;
       }
     }
     return false;
   }
+  
   return config.dirs
     .filter(dir => hasPaths([
-      new RegExp(`^${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/[^/]+$`),
+      dir,
       ...getModuleSources(dir)
-        .map(src => new RegExp(`${src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/[^/]+$`)),
     ]))
 }
 
