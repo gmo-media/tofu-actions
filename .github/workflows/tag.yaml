@@ -32,7 +32,7 @@ jobs:
           ORIG_VERSION="$VERSION"
 
           # Get number parts
-          MAJOR="${VERSION%%.*}"; VERSION="${VERSION#*.}"
+          MAJOR="${VERSION%%.*}"; VERSION="${VERSION#*.}"; MAJOR="${MAJOR#v}"
           MINOR="${VERSION%%.*}"; VERSION="${VERSION#*.}"
           PATCH="${VERSION%%.*}"; VERSION="${VERSION#*.}"
     
@@ -51,7 +51,7 @@ jobs:
             echo "Unknown strategy: $STRATEGY"
             exit 1
           fi
-          NEW_TAG="$MAJOR.$MINOR.$PATCH"
+          NEW_TAG="v$MAJOR.$MINOR.$PATCH"
           echo "Calculating new tag... $ORIG_VERSION => $NEW_TAG"
     
           # Get current hash and see if it already has a tag
