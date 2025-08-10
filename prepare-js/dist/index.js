@@ -31309,9 +31309,16 @@ const calculateRunDirs = (config) => {
     const changedFiles = fileContent ? fileContent.split(' ') : [];
     console.log(`[prepare] ${changedFiles.length} files were changed, calculating which CI to run...`);
     // Determine which CI to run
-    const hasPaths = (matchers) => {
-        for (const matcher of matchers) {
-            if (changedFiles.some(file => matcher.test(file))) {
+    const isDirectChildPath = (prefix, filePath) => {
+        if (prefix.length === 0 || !filePath.startsWith(`${prefix}/`)) {
+            return false;
+        }
+        const relativePath = filePath.slice(prefix.length + 1);
+        return relativePath.length > 0 && !relativePath.includes('/');
+    };
+    const hasPaths = (prefixes) => {
+        for (const prefix of prefixes) {
+            if (changedFiles.some(file => isDirectChildPath(prefix, file))) {
                 return true;
             }
         }
@@ -31319,9 +31326,8 @@ const calculateRunDirs = (config) => {
     };
     return config.dirs
         .filter(dir => hasPaths([
-        new RegExp(`^${dir}/[^/]+$`),
+        dir,
         ...getModuleSources(dir)
-            .map(src => new RegExp(`${src}/[^/]+$`)),
     ]));
 };
 const run = async () => {
@@ -31341,7 +31347,7 @@ const run = async () => {
     if (pr) {
         console.log(`[prepare] Associated merged PR #${pr.number} found`);
         coreExports.setOutput('merged-pr-number', pr.number);
-        const workflowId = coreExports.getInput('workflow-id') || '' + (await getSelfWorkflowId());
+        const workflowId = coreExports.getInput('workflow-id') || `${await getSelfWorkflowId()}`;
         console.log(`[prepare] Looking up for workflow ID ${workflowId} ...`);
         const latestRunId = await getLatestRunId(pr.head.sha, workflowId);
         if (latestRunId) {
