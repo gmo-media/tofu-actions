@@ -1,14 +1,15 @@
 # tofu-actions
 
-This is a simpler alternative to [suzuki-shunsuke/tfaction](https://github.com/suzuki-shunsuke/tfaction)
-focused to our use-cases:
+gmo-media/tofu-actions is a collection of reusable GitHub Actions for OpenTofu.
+While being a simpler alternative to [suzuki-shunsuke/tfaction](https://github.com/suzuki-shunsuke/tfaction),
+gmo-media/tofu-actions is focused to our use-cases:
 
 - Only supports OpenTofu (and not Terraform) for now
 - Monorepo support (multiple tofu directories exist in one repository)
 - local-path modules within the repository
 
 If you want to do more advanced stuff or want to rely on battle-tested solutions,
-consider a more maintained actions like [suzuki-shunsuke/tfaction](https://github.com/suzuki-shunsuke/tfaction).
+consider a more maintained solution like suzuki-shunsuke/tfaction.
 
 ## Installation
 
