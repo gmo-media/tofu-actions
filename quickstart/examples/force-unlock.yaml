@@ -8,6 +8,7 @@ on:
       dir:
         description: Directory to run in
         type: choice
+        required: true
         default: dev
         options:
           - dev
