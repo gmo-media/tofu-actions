@@ -31319,9 +31319,9 @@ const calculateRunDirs = (config) => {
     };
     return config.dirs
         .filter(dir => hasPaths([
-        new RegExp(`^${dir}/[^/]+$`),
+        new RegExp(`^${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/[^/]+$`),
         ...getModuleSources(dir)
-            .map(src => new RegExp(`${src}/[^/]+$`)),
+            .map(src => new RegExp(`${src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/[^/]+$`)),
     ]));
 };
 const run = async () => {
@@ -31341,7 +31341,7 @@ const run = async () => {
     if (pr) {
         console.log(`[prepare] Associated merged PR #${pr.number} found`);
         coreExports.setOutput('merged-pr-number', pr.number);
-        const workflowId = coreExports.getInput('workflow-id') || '' + (await getSelfWorkflowId());
+        const workflowId = coreExports.getInput('workflow-id') || `${await getSelfWorkflowId()}`;
         console.log(`[prepare] Looking up for workflow ID ${workflowId} ...`);
         const latestRunId = await getLatestRunId(pr.head.sha, workflowId);
         if (latestRunId) {

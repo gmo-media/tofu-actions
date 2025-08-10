@@ -66,9 +66,9 @@ const calculateRunDirs = (config: Config): string[] => {
   }
   return config.dirs
     .filter(dir => hasPaths([
-      new RegExp(`^${dir}/[^/]+$`),
+      new RegExp(`^${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/[^/]+$`),
       ...getModuleSources(dir)
-        .map(src => new RegExp(`${src}/[^/]+$`)),
+        .map(src => new RegExp(`${src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/[^/]+$`)),
     ]))
 }
 
@@ -93,7 +93,7 @@ const run = async () => {
     console.log(`[prepare] Associated merged PR #${pr.number} found`)
     core.setOutput('merged-pr-number', pr.number)
 
-    const workflowId = core.getInput('workflow-id') || '' + (await getSelfWorkflowId())
+    const workflowId = core.getInput('workflow-id') || `${await getSelfWorkflowId()}`
     console.log(`[prepare] Looking up for workflow ID ${workflowId} ...`)
     const latestRunId = await getLatestRunId(pr.head.sha, workflowId)
     if (latestRunId) {
