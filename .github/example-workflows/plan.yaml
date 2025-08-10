@@ -22,9 +22,9 @@ jobs:
       - uses: opentofu/setup-opentofu@v1
         with:
           tofu_version_file: .opentofu-version
-      - uses: gmo-media/tofu-actions/setup-aws-credentials@v1
+      - uses: gmo-media/tofu-actions/setup-aws-credentials@v2
         with:
           aws_credentials: ${{ secrets.AWS_CREDENTIALS }}
-      - uses: gmo-media/tofu-actions/plan@v1
+      - uses: gmo-media/tofu-actions/plan@v2
         with:
           dir: ${{ inputs.dir }}

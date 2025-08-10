@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: prepare
-        uses: gmo-media/tofu-actions/prepare@v1
+        uses: gmo-media/tofu-actions/prepare@v2
         with:
           force-all-changed: 'true'
     outputs:
@@ -31,15 +31,15 @@ jobs:
       - uses: opentofu/setup-opentofu@v1
         with:
           tofu_version_file: .opentofu-version
-      - uses: gmo-media/tofu-actions/setup-aws-credentials@v1
+      - uses: gmo-media/tofu-actions/setup-aws-credentials@v2
         with:
           aws_credentials: ${{ secrets.AWS_CREDENTIALS }}
       - id: plan
-        uses: gmo-media/tofu-actions/plan@v1
+        uses: gmo-media/tofu-actions/plan@v2
         with:
           dir: ${{ matrix.dir }}
       - if: ${{ steps.plan.outputs.has-diff == 'true' }}
-        uses: gmo-media/tofu-actions/notify-drift@v1
+        uses: gmo-media/tofu-actions/notify-drift@v2
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}

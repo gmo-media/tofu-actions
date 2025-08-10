@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: prepare
-        uses: gmo-media/tofu-actions/prepare@v1
+        uses: gmo-media/tofu-actions/prepare@v2
     outputs:
       strategy: ${{ steps.prepare.outputs.strategy }}
       merged-pr-run-id: ${{ steps.prepare.outputs.merged-pr-run-id }}
@@ -45,10 +45,10 @@ jobs:
       - uses: opentofu/setup-opentofu@v1
         with:
           tofu_version_file: .opentofu-version
-      - uses: gmo-media/tofu-actions/setup-aws-credentials@v1
+      - uses: gmo-media/tofu-actions/setup-aws-credentials@v2
         with:
           aws_credentials: ${{ secrets.AWS_CREDENTIALS }}
-      - uses: gmo-media/tofu-actions/plan@v1
+      - uses: gmo-media/tofu-actions/plan@v2
         with:
           dir: ${{ matrix.dir }}
 
@@ -58,7 +58,7 @@ jobs:
     name: Plan comment
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/plan-comment@v1
+      - uses: gmo-media/tofu-actions/plan-comment@v2
 
   apply:
     needs: [ prepare ]
@@ -74,10 +74,10 @@ jobs:
       - uses: opentofu/setup-opentofu@v1
         with:
           tofu_version_file: .opentofu-version
-      - uses: gmo-media/tofu-actions/setup-aws-credentials@v1
+      - uses: gmo-media/tofu-actions/setup-aws-credentials@v2
         with:
           aws_credentials: ${{ secrets.AWS_CREDENTIALS }}
-      - uses: gmo-media/tofu-actions/apply@v1
+      - uses: gmo-media/tofu-actions/apply@v2
         with:
           dir: ${{ matrix.dir }}
           run-id: ${{ needs.prepare.outputs.merged-pr-run-id }}
