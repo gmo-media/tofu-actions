@@ -30,5 +30,5 @@ export default {
 
 You can copy files inside `.github/example-workflows/` and put them under `.github/workflows` of your repository.
 
+- Add `.opentofu-version` file to repository root, as used in example workflows.
 - Modify workflow_dispatch's `dir` options and its default, if needed.
-- Modify `TOFU_VERSION` in each file, if needed.

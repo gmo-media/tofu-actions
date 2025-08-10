@@ -2,6 +2,10 @@ name: tofu-actions prepare-js
 description: Calculates directories to run based on changed files.
 
 inputs:
+  github-token:
+    description: GitHub token for API access (defaults to github.token)
+    default: ${{ github.token }}
+
   config:
     description: Tofu actions config file
     required: true
@@ -14,6 +18,11 @@ inputs:
       Useful for drift checking.
     default: 'false'
 
+  workflow-id:
+    description: >-
+      Workflow ID (e.g. ci.yaml), used to retrieve the latest run ID in the associated PR.
+      Defaults to the current workflow ID.
+
 outputs:
   strategy:
     description: Strategy matrix JSON
@@ -21,6 +30,11 @@ outputs:
     description: Directories to run separated by space
   count:
     description: Number of directories to run
+
+  merged-pr-number:
+    description: Associated merged PR number with current HEAD (if any)
+  merged-pr-run-id:
+    description: Latest run ID of the workflow in the associated PR (if any)
 
 runs:
   using: node20

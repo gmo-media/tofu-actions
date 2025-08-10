@@ -1,16 +1,15 @@
-# Plan on pull requests
+# Plan and apply on pull requests
 name: CI
 
 on:
+  push:
+    branches:
+      - master
   pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: false
-
-env:
-  AWS_REGION: ap-northeast-1
-  TOFU_VERSION: 1.10.5
 
 jobs:
   format:
@@ -19,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: opentofu/setup-opentofu@v1
         with:
-          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_version_file: .opentofu-version
       - run: tofu fmt -recursive -check
 
   prepare:
@@ -27,14 +26,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: prepare
-        uses: gmo-media/tofu-actions/prepare@v1
+        uses: gmo-media/tofu-actions/prepare@v2
     outputs:
       strategy: ${{ steps.prepare.outputs.strategy }}
+      merged-pr-run-id: ${{ steps.prepare.outputs.merged-pr-run-id }}
 
   plan:
     needs: [ prepare ]
     name: Plan (${{ matrix.dir }})
-    if: ${{ needs.prepare.outputs.strategy != '[]' }}
+    if: ${{ github.event_name == 'pull_request' && needs.prepare.outputs.strategy != '[]' }}
     strategy:
       fail-fast: false
       matrix:
@@ -44,11 +44,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: opentofu/setup-opentofu@v1
         with:
-          tofu_version: ${{ env.TOFU_VERSION }}
-      - uses: gmo-media/tofu-actions/setup-aws-credentials@v1
+          tofu_version_file: .opentofu-version
+      - uses: gmo-media/tofu-actions/setup-aws-credentials@v2
         with:
           aws_credentials: ${{ secrets.AWS_CREDENTIALS }}
-      - uses: gmo-media/tofu-actions/plan@v1
+      - uses: gmo-media/tofu-actions/plan@v2
         with:
           dir: ${{ matrix.dir }}
 
@@ -58,4 +58,26 @@ jobs:
     name: Plan comment
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/plan-comment@v1
+      - uses: gmo-media/tofu-actions/plan-comment@v2
+
+  apply:
+    needs: [ prepare ]
+    name: Apply (${{ matrix.dir }})
+    if: ${{ github.event_name == 'push' && needs.prepare.outputs.strategy != '[]' && needs.prepare.outputs.merged-pr-run-id != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version_file: .opentofu-version
+      - uses: gmo-media/tofu-actions/setup-aws-credentials@v2
+        with:
+          aws_credentials: ${{ secrets.AWS_CREDENTIALS }}
+      - uses: gmo-media/tofu-actions/apply@v2
+        with:
+          dir: ${{ matrix.dir }}
+          run-id: ${{ needs.prepare.outputs.merged-pr-run-id }}

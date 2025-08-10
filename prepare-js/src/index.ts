@@ -2,13 +2,14 @@ import * as core from '@actions/core'
 import * as fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from "node:path";
+import { getLatestRunId, getAssociatedMergedPr, getSelfWorkflowId } from "./run-id.js";
 
 interface Config {
   dirs: string[];
 }
 
 const readConfig = async (): Promise<Config> => {
-  const configPath = core.getInput('config')
+  const configPath = core.getInput('config', { required: true })
   const module = await import(path.resolve(process.cwd(), configPath))
   return module.default
 }
@@ -23,7 +24,7 @@ interface TerraformConfigInspect {
 }
 
 const inspectDir = (dir: string): TerraformConfigInspect => {
-  const bin = core.getInput('terraform-config-inspect')
+  const bin = core.getInput('terraform-config-inspect', { required: true })
   const res = spawnSync(bin, ['--json', dir])
   if (res.error) {
     throw res.error
@@ -52,7 +53,7 @@ const calculateRunDirs = (config: Config): string[] => {
   const outputFile = '.github/outputs/all_changed_and_modified_files.txt';
   const fileContent = fs.readFileSync(outputFile, 'utf8').trim();
   const changedFiles = fileContent ? fileContent.split(' ') : [];
-  console.log(`${changedFiles.length} files were changed, calculating which CI to run...`)
+  console.log(`[prepare] ${changedFiles.length} files were changed, calculating which CI to run...`)
 
   // Determine which CI to run
   const hasPaths = (matchers: RegExp[]) => {
@@ -74,17 +75,32 @@ const calculateRunDirs = (config: Config): string[] => {
 const run = async () => {
   const config = await readConfig()
 
-  const forceAllChanged = core.getInput('force-all-changed') === 'true'
+  const forceAllChanged = core.getInput('force-all-changed', { required: true }) === 'true'
   if (forceAllChanged) {
     console.log(`[prepare] force-all-changed flag is on. Short-circuiting and outputting all paths as 'changed'...`)
   }
   const runDirs = forceAllChanged ? config.dirs : calculateRunDirs(config)
 
-  console.log(`Running on directories: ${runDirs}`)
+  console.log(`[prepare] Running on directories: ${runDirs}`)
   const strategy = runDirs.map(dir => ({ dir }))
   core.setOutput('strategy', JSON.stringify(strategy))
   core.setOutput('dirs', runDirs.join(' '))
   core.setOutput('count', runDirs.length)
+
+  // Get associated PR and its latest workflow run ID (if any), for auto-apply purposes
+  const pr = await getAssociatedMergedPr()
+  if (pr) {
+    console.log(`[prepare] Associated merged PR #${pr.number} found`)
+    core.setOutput('merged-pr-number', pr.number)
+
+    const workflowId = core.getInput('workflow-id') || '' + (await getSelfWorkflowId())
+    console.log(`[prepare] Looking up for workflow ID ${workflowId} ...`)
+    const latestRunId = await getLatestRunId(pr.head.sha, workflowId)
+    if (latestRunId) {
+      console.log(`[prepare] Latest run #${latestRunId} found for workflow ${workflowId} in PR #${pr.number}`)
+      core.setOutput('merged-pr-run-id', latestRunId)
+    }
+  }
 }
 
 run().catch(err => {
