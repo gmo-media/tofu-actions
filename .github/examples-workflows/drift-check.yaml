@@ -8,7 +8,7 @@ on:
 
 jobs:
   drift-check:
-    uses: gmo-media/tofu-actions/.github/workflows/quickstart-drift-check.yaml@v2
+    uses: gmo-media/tofu-actions/.github/workflows/quickstart-drift-check.yaml@v3
     with:
       aws-role: arn:aws:iam::0123456789:role/my-plan-role-name
     secrets:

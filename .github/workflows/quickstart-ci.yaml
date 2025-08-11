@@ -66,7 +66,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - id: prepare
-        uses: gmo-media/tofu-actions/prepare@v2
+        uses: gmo-media/tofu-actions/prepare@v3
     outputs:
       strategy: ${{ steps.prepare.outputs.strategy }}
       merged-pr-run-id: ${{ steps.prepare.outputs.merged-pr-run-id }}
@@ -84,7 +84,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - if: ${{ inputs.auth-mode == 'aws-cred' }}
-        uses: gmo-media/tofu-actions/setup-aws-credentials@v2
+        uses: gmo-media/tofu-actions/setup-aws-credentials@v3
         with:
           aws_credentials: ${{ secrets.aws-cred }}
       - if: ${{ inputs.auth-mode == 'aws-oidc' }}
@@ -102,7 +102,7 @@ jobs:
         with:
           tofu_version_file: .opentofu-version
 
-      - uses: gmo-media/tofu-actions/plan@v2
+      - uses: gmo-media/tofu-actions/plan@v3
         with:
           dir: ${{ matrix.dir }}
 
@@ -112,7 +112,7 @@ jobs:
     name: Plan comment
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/plan-comment@v2
+      - uses: gmo-media/tofu-actions/plan-comment@v3
 
   apply:
     needs: [ prepare ]
@@ -127,7 +127,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - if: ${{ inputs.auth-mode == 'aws-cred' }}
-        uses: gmo-media/tofu-actions/setup-aws-credentials@v2
+        uses: gmo-media/tofu-actions/setup-aws-credentials@v3
         with:
           aws_credentials: ${{ secrets.aws-cred }}
       - if: ${{ inputs.auth-mode == 'aws-oidc' }}
@@ -145,7 +145,7 @@ jobs:
         with:
           tofu_version_file: .opentofu-version
 
-      - uses: gmo-media/tofu-actions/apply@v2
+      - uses: gmo-media/tofu-actions/apply@v3
         with:
           dir: ${{ matrix.dir }}
           run-id: ${{ needs.prepare.outputs.merged-pr-run-id }}
@@ -163,7 +163,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - if: ${{ inputs.auth-mode == 'aws-cred' }}
-        uses: gmo-media/tofu-actions/setup-aws-credentials@v2
+        uses: gmo-media/tofu-actions/setup-aws-credentials@v3
         with:
           aws_credentials: ${{ secrets.aws-cred }}
       - if: ${{ inputs.auth-mode == 'aws-oidc' }}
@@ -182,11 +182,11 @@ jobs:
           tofu_version_file: .opentofu-version
 
       - id: plan
-        uses: gmo-media/tofu-actions/plan@v2
+        uses: gmo-media/tofu-actions/plan@v3
         with:
           dir: ${{ matrix.dir }}
       - if: ${{ steps.plan.outputs.has-diff == 'true' }}
-        uses: gmo-media/tofu-actions/notify-drift@v2
+        uses: gmo-media/tofu-actions/notify-drift@v3
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}

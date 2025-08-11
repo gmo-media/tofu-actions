@@ -20,7 +20,7 @@ on:
 
 jobs:
   apply:
-    uses: gmo-media/tofu-actions/.github/workflows/quickstart-apply.yaml@v2
+    uses: gmo-media/tofu-actions/.github/workflows/quickstart-apply.yaml@v3
     with:
       aws-role: arn:aws:iam::0123456789:role/my-apply-role-name
       dir: ${{ inputs.dir }}
