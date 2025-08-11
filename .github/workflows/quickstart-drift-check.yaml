@@ -83,7 +83,7 @@ jobs:
         with:
           dir: ${{ matrix.dir }}
 
-      - if: ${{ steps.plan.outputs.has-diff == 'true' && inputs.drift-notify-webhook != '' }}
+      - if: ${{ steps.plan.outputs.has-diff == 'true' && secrets.drift-notify-webhook != '' }}
         uses: gmo-media/tofu-actions/notify-drift@v4
         with:
           dir: ${{ matrix.dir }}
@@ -92,7 +92,7 @@ jobs:
 
       - if: |
           steps.plan.outputs.has-diff == 'true' &&
-          (inputs.anthropic-api-key != '' || inputs.claude-code-oauth-token != '')
+          (secrets.anthropic-api-key != '' || secrets.claude-code-oauth-token != '')
         uses: gmo-media/tofu-actions/drift-fix-claude@v4
         with:
           dir: ${{ inputs.dir }}
@@ -101,7 +101,7 @@ jobs:
           claude-code-oauth-token: ${{ secrets.claude-code-oauth-token }}
 
       # Simply fail to notify the user if no webhook is given
-      - if: ${{ steps.plan.outputs.has-diff == 'true' && inputs.drift-notify-webhook == '' }}
+      - if: ${{ steps.plan.outputs.has-diff == 'true' && secrets.drift-notify-webhook == '' }}
         shell: bash
         run: |
           echo "Drift detected in ${{ matrix.dir }}."
