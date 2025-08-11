@@ -90,19 +90,9 @@ jobs:
           webhook: ${{ secrets.drift-notify-webhook }}
 
       - if: |
-         needs.drift-check.outputs.has-diff == 'true' &&
-         (inputs.anthropic-api-key != '' || inputs.claude-code-oauth-token != '')
-        uses: gmo-media/tofu-actions/configure@v4
-        with:
-          dir: ${{ matrix.dir }}
-          auth-mode: ${{ inputs.auth-mode }}
-          aws-region: ${{ inputs.aws-region }}
-          aws-role: ${{ inputs.aws-role }}
-          aws-cred: ${{ secrets.aws-cred }}
-          gcp-project: ${{ inputs.gcp-project }}
-          gcp-idp: ${{ inputs.gcp-idp }}
-
-      - uses: gmo-media/tofu-actions/drift-fix-claude@v4
+          needs.drift-check.outputs.has-diff == 'true' &&
+          (inputs.anthropic-api-key != '' || inputs.claude-code-oauth-token != '')
+        uses: gmo-media/tofu-actions/drift-fix-claude@v4
         with:
           dir: ${{ inputs.dir }}
           plan: ${{ needs.drift-check.outputs.plan }}
