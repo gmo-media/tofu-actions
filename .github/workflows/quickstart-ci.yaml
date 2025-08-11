@@ -31,15 +31,14 @@ on:
           e.g. projects/0123456789/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
         type: string
 
-      drift-notify-webhook:
-        description: Slack webhook URL for drift notification
-        type: string
-        required: true
-
     secrets:
       aws-cred:
         description: AWS credentials (required when auth-mode is aws-cred)
         required: false
+
+      drift-notify-webhook:
+        description: Slack webhook URL for drift notification
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -191,4 +190,4 @@ jobs:
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
-          webhook: ${{ inputs.drift-notify-webhook }}
+          webhook: ${{ secrets.drift-notify-webhook }}

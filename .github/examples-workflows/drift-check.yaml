@@ -11,4 +11,5 @@ jobs:
     uses: gmo-media/tofu-actions/.github/workflows/quickstart-drift-check.yaml@v2
     with:
       aws-role: arn:aws:iam::0123456789:role/my-plan-role-name
-      drift-notify-webhook: "https://hooks.slack.com/..."
+    secrets:
+      drift-notify-webhook: ${{ secrets.DRIFT_NOTIFY_WEBHOOK }}
