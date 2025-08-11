@@ -37,5 +37,5 @@ outputs:
     description: Latest run ID of the workflow in the associated PR (if any)
 
 runs:
-  using: node20
+  using: node24
   main: dist/index.js
