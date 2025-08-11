@@ -45,68 +45,6 @@ runs:
         PLAN: ${{ inputs.plan }}
       run: echo "$PLAN" > /tmp/plan.txt
 
-    - name: Setup prompt
-      shell: bash
-      run: |
-        cat <<EOF > /tmp/prompt.txt
-        # CRITICAL INSTRUCTIONS FOR FIXING INFRASTRUCTURE DRIFT
-        
-        You have been given a critical task to fix infrastructure drift in Terraform/OpenTofu configuration files.
-        Your goal is to update the .tf files to match the current real-world infrastructure state.
-        Only do "tofu plan" and make changes to .tf files - NEVER do "tofu apply", git commit, or git push.
-
-        ## Context
-        - Directory with drift: ${{ inputs.dir }}
-        - The drift details are in /tmp/plan.txt
-
-        ## YOUR MISSION - FOLLOW THESE STEPS STRICTLY:
-        
-        1. **READ THE DRIFT CONTEXT**
-           - Read /tmp/plan.txt to understand what has drifted
-           - Analyze the plan output to identify exactly what has changed in the real infrastructure
-        
-        2. **UNDERSTAND THE CHANGES**
-           - The plan shows differences between your .tf files and the actual infrastructure
-           - The plan is usually trying to *revert* the external changes done to the infrastructure
-           - The plan usually shows quite verbose output with default values
-        
-        3. **FIX THE DRIFT - CRITICAL RULES**
-           - Update .tf files to match the CURRENT REAL INFRASTRUCTURE STATE
-           - This means: incorporate the external changes into your .tf files
-           - NEVER add default values unless they are needed for some reason
-           - Make MINIMAL changes - only update lines that are actually drifted
-           - DO NOT touch any .tf source lines that was NOT modified externally
-           - Your changes should make the infrastructure code match reality, not the other way around
-        
-        4. **VALIDATION**
-           - After making changes, run: `tofu plan` within directory `${{ inputs.dir }}`.
-           - The plan MUST show "No changes. Your infrastructure matches the configuration."
-           - If there are still differences, continue fixing until plan shows no changes
-           - Keep iterating until you achieve zero drift
-        
-        5. **IMPORTANT PRINCIPLES**
-           - This is a NON-DESTRUCTIVE operation - we're updating code to match reality
-           - Always choose the least destructive approach
-           - Preserve the existing infrastructure state
-           - Only add explicit values that differ from defaults
-           - Be surgical and precise with your edits
-        
-        ## Example Interpretation:
-        If the plan shows:
-        ```
-        ~ resource "aws_instance" "example" {
-            ~ instance_type = "t3.micro" -> "t2.micro"
-        }
-        ```
-        This means the plan is trying to revert the external change done to the instance type.
-        Therefore, we can deduce that a user may have manually changed the instance type from t2.micro to t3.micro.
-        You should update the .tf file to have "t3.micro" to match reality.
-        
-        Start by reading the plan, then fix the configuration files to eliminate all drift.
-        Remember: Your success is measured by achieving "No changes" in the tofu plan output.
-        NEVER run "tofu apply" even if there is a need to update tfstate. Do NOT make disruptive changes.
-        EOF
-
     - name: Setup Claude Code
       shell: bash
       run: |
@@ -117,13 +55,71 @@ runs:
     - name: Fix drift with Claude Code
       shell: bash
       run: |
-        cat prompt.txt | \
+        echo "$PROMPT" | \
           claude -p --verbose --output-format stream-json \
           --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write" \
           --disallowedTools "Bash(tofu apply),Bash(git commit),Bash(git push)"
       env:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
+        PROMPT: |
+          cat <<EOF > /tmp/prompt.txt
+          # CRITICAL INSTRUCTIONS FOR FIXING INFRASTRUCTURE DRIFT
+          
+          You have been given a critical task to fix infrastructure drift in Terraform/OpenTofu configuration files.
+          Your goal is to update the .tf files to match the current real-world infrastructure state.
+          Only do "tofu plan" and make changes to .tf files - NEVER do "tofu apply", git commit, or git push.
+  
+          ## Context
+          - Directory with drift: ${{ inputs.dir }}
+          - The drift details are in /tmp/plan.txt
+  
+          ## YOUR MISSION - FOLLOW THESE STEPS STRICTLY:
+          
+          1. **READ THE DRIFT CONTEXT**
+             - Read /tmp/plan.txt to understand what has drifted
+             - Analyze the plan output to identify exactly what has changed in the real infrastructure
+          
+          2. **UNDERSTAND THE CHANGES**
+             - The plan shows differences between your .tf files and the actual infrastructure
+             - The plan is usually trying to *revert* the external changes done to the infrastructure
+             - The plan usually shows quite verbose output with default values
+          
+          3. **FIX THE DRIFT - CRITICAL RULES**
+             - Update .tf files to match the CURRENT REAL INFRASTRUCTURE STATE
+             - This means: incorporate the external changes into your .tf files
+             - NEVER add default values unless they are needed for some reason
+             - Make MINIMAL changes - only update lines that are actually drifted
+             - DO NOT touch any .tf source lines that was NOT modified externally
+             - Your changes should make the infrastructure code match reality, not the other way around
+          
+          4. **VALIDATION**
+             - After making changes, run: `tofu plan` within directory `${{ inputs.dir }}`.
+             - The plan MUST show "No changes. Your infrastructure matches the configuration."
+             - If there are still differences, continue fixing until plan shows no changes
+             - Keep iterating until you achieve zero drift
+          
+          5. **IMPORTANT PRINCIPLES**
+             - This is a NON-DESTRUCTIVE operation - we're updating code to match reality
+             - Always choose the least destructive approach
+             - Preserve the existing infrastructure state
+             - Only add explicit values that differ from defaults
+             - Be surgical and precise with your edits
+          
+          ## Example Interpretation:
+          If the plan shows:
+          ```
+          ~ resource "aws_instance" "example" {
+              ~ instance_type = "t3.micro" -> "t2.micro"
+          }
+          ```
+          This means the plan is trying to revert the external change done to the instance type.
+          Therefore, we can deduce that a user may have manually changed the instance type from t2.micro to t3.micro.
+          You should update the .tf file to have "t3.micro" to match reality.
+          
+          Start by reading the plan, then fix the configuration files to eliminate all drift.
+          Remember: Your success is measured by achieving "No changes" in the tofu plan output.
+          NEVER run "tofu apply" even if there is a need to update tfstate. Do NOT make disruptive changes.
 
     # Commit the changes (whether successful or not, for debugging)
     - name: Commit changes
