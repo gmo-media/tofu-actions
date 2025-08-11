@@ -90,7 +90,7 @@ jobs:
           webhook: ${{ secrets.drift-notify-webhook }}
 
       - if: |
-          needs.drift-check.outputs.has-diff == 'true' &&
+          steps.plan.outputs.has-diff == 'true' &&
           (inputs.anthropic-api-key != '' || inputs.claude-code-oauth-token != '')
         uses: gmo-media/tofu-actions/drift-fix-claude@v4
         with:
