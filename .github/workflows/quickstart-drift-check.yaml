@@ -35,6 +35,9 @@ on:
         description: Slack webhook URL for drift notification (if omitted, the step fails on detecting drift)
         required: false
 
+      github-token:
+        description: GitHub token for creating PR in automatic drift fix (optional, required for triggering workflows)
+        required: false
       anthropic-api-key:
         description: Anthropic API key for automatic drift fix
         required: false
@@ -112,6 +115,7 @@ jobs:
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
+          github-token: ${{ secrets.github-token }}
           anthropic-api-key: ${{ secrets.claude-api-key }}
           claude-code-oauth-token: ${{ secrets.claude-code-oauth-token }}
 
