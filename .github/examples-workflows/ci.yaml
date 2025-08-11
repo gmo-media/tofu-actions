@@ -7,6 +7,12 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+  id-token: write
+
 jobs:
   ci:
     uses: gmo-media/tofu-actions/.github/workflows/quickstart-ci.yaml@v3

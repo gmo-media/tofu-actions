@@ -18,6 +18,10 @@ on:
         type: string
         required: true
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   force-unlock:
     uses: gmo-media/tofu-actions/.github/workflows/quickstart-force-unlock.yaml@v3

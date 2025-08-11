@@ -18,6 +18,11 @@ on:
         type: string
         required: true
 
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
 jobs:
   apply:
     uses: gmo-media/tofu-actions/.github/workflows/quickstart-apply.yaml@v3
