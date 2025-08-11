@@ -47,6 +47,12 @@ runs:
       with:
         project_id: ${{ inputs.gcp-project }}
         workload_identity_provider: ${{ inputs.gcp-idp }}
+    - if: ${{ inputs.auth-mode == 'gcp-oidc' }}
+      name: Ignore generated credentials from google-github-actions/auth
+      shell: bash
+      run: |
+        mkdir -p ~/.config/git
+        echo "gha-creds-*.json" >> ~/.config/git/ignore
 
     - uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
       with:
