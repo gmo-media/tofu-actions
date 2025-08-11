@@ -43,18 +43,26 @@ runs:
         PLAN: ${{ inputs.plan }}
       run: echo "$PLAN" > /tmp/plan.txt
 
+    - name: Setup Claude Code
+      shell: bash
+      run: |
+        curl -fsSL https://claude.ai/install.sh | bash -s latest
+        export PATH="~/.local/bin:$PATH"
+
     # Use Claude Code to fix the drift
     - name: Fix drift with Claude Code
-      uses: anthropics/claude-code-action@beta
-      with:
-        mode: agent
-        anthropic_api_key: ${{ inputs.anthropic-api-key }}
-        claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
-        direct_prompt: |
+      shell: bash
+      run: |
+        claude -p --dangerously-skip-permissions "$PROMPT"
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
+        PROMPT: |
           # CRITICAL INSTRUCTIONS FOR FIXING INFRASTRUCTURE DRIFT
 
           You have been given a critical task to fix infrastructure drift in Terraform/OpenTofu configuration files.
           Your goal is to update the .tf files to match the current real-world infrastructure state.
+          Only make changes to .tf files - NEVER do git commits or pushes.
 
           ## Context
           - Directory with drift: ${{ inputs.dir }}
