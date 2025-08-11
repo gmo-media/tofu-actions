@@ -50,28 +50,17 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-
-      - if: ${{ inputs.auth-mode == 'aws-cred' }}
-        uses: gmo-media/tofu-actions/setup-aws-credentials@v3
+      - uses: gmo-media/tofu-actions/configure@v4
         with:
-          aws_credentials: ${{ secrets.aws-cred }}
-      - if: ${{ inputs.auth-mode == 'aws-oidc' }}
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
-        with:
+          dir: ${{ inputs.dir }}
+          auth-mode: ${{ inputs.auth-mode }}
           aws-region: ${{ inputs.aws-region }}
-          role-to-assume: ${{ inputs.aws-role }}
-      - if: ${{ inputs.auth-mode == 'gcp-oidc' }}
-        uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f # v2
-        with:
-          project_id: ${{ inputs.gcp-project }}
-          workload_identity_provider: ${{ inputs.gcp-idp }}
+          aws-role: ${{ inputs.aws-role }}
+          aws-cred: ${{ secrets.aws-cred }}
+          gcp-project: ${{ inputs.gcp-project }}
+          gcp-idp: ${{ inputs.gcp-idp }}
 
-      - uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
-        with:
-          tofu_version_file: .opentofu-version
-
-      - uses: gmo-media/tofu-actions/apply@v3
+      - uses: gmo-media/tofu-actions/apply@v4
         with:
           dir: ${{ inputs.dir }}
           run-id: ${{ inputs.run-id }}

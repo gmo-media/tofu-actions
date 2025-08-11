@@ -1,0 +1,192 @@
+name: Fix Drift with Claude
+
+inputs:
+  dir:
+    description: Directory that has drift to fix
+    required: true
+  plan:
+    description: The plan output from drift check showing the drift
+    required: true
+
+  github-token:
+    description: GitHub token (GitHub App or PAT is required to trigger workflows)
+  anthropic-api-key:
+    description: Anthropic API key
+  claude-code-oauth-token:
+    description: Claude Code OAuth token (alternative to anthropic_api_key)
+
+  base-branch:
+    description: Base branch for the PR
+    default: ${{ github.ref_name }}
+
+outputs:
+  pr-url:
+    description: URL of the created pull request
+    value: ${{ steps.create-pr.outputs.pr-url }}
+  branch-name:
+    description: Name of the branch with fixes
+    value: ${{ steps.branch.outputs.name }}
+
+runs:
+  using: composite
+  steps:
+    # Create a new branch for the fix
+    - name: Create fix branch
+      id: branch
+      shell: bash
+      run: |
+        BRANCH_NAME="fix-drift-$(echo '${{ inputs.dir }}' | tr '/' '-')-$(date +%Y%m%d-%H%M%S)"
+        git checkout -b "$BRANCH_NAME"
+        echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+    - name: Save plan to file
+      shell: bash
+      env:
+        PLAN: ${{ inputs.plan }}
+      run: echo "$PLAN" > /tmp/plan.txt
+
+    - name: Setup Claude Code
+      shell: bash
+      run: |
+        curl -fsSL https://claude.ai/install.sh | bash -s latest
+        export PATH="~/.local/bin:$PATH"
+
+    # Use Claude Code to fix the drift
+    - name: Fix drift with Claude Code
+      shell: bash
+      run: |
+        echo "$PROMPT" | \
+          claude -p --verbose --output-format stream-json \
+          --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write" \
+          --disallowedTools "Bash(tofu apply),Bash(git commit),Bash(git push)"
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
+        PROMPT: |
+          cat <<EOF > /tmp/prompt.txt
+          # CRITICAL INSTRUCTIONS FOR FIXING INFRASTRUCTURE DRIFT
+          
+          You have been given a critical task to fix infrastructure drift in Terraform/OpenTofu configuration files.
+          Your goal is to update the .tf files to match the current real-world infrastructure state.
+          Only do "tofu plan" and make changes to .tf files - NEVER do "tofu apply", git commit, or git push.
+  
+          ## Context
+          - Directory with drift: ${{ inputs.dir }}
+          - The drift details are in /tmp/plan.txt
+  
+          ## YOUR MISSION - FOLLOW THESE STEPS STRICTLY:
+          
+          1. **READ THE DRIFT CONTEXT**
+             - Read /tmp/plan.txt to understand what has drifted
+             - Analyze the plan output to identify exactly what has changed in the real infrastructure
+          
+          2. **UNDERSTAND THE CHANGES**
+             - The plan shows differences between your .tf files and the actual infrastructure
+             - The plan is usually trying to *revert* the external changes done to the infrastructure
+             - The plan usually shows quite verbose output with default values
+          
+          3. **FIX THE DRIFT - CRITICAL RULES**
+             - Update .tf files to match the CURRENT REAL INFRASTRUCTURE STATE
+             - This means: incorporate the external changes into your .tf files
+             - NEVER add default values unless they are needed for some reason
+             - Make MINIMAL changes - only update lines that are actually drifted
+             - DO NOT touch any .tf source lines that was NOT modified externally
+             - Your changes should make the infrastructure code match reality, not the other way around
+          
+          4. **VALIDATION**
+             - After making changes, run: `tofu plan` within directory `${{ inputs.dir }}`.
+             - The plan MUST show "No changes. Your infrastructure matches the configuration."
+             - If there are still differences, continue fixing until plan shows no changes
+             - Keep iterating until you achieve zero drift
+          
+          5. **IMPORTANT PRINCIPLES**
+             - This is a NON-DESTRUCTIVE operation - we're updating code to match reality
+             - Always choose the least destructive approach
+             - Preserve the existing infrastructure state
+             - Only add explicit values that differ from defaults
+             - Be surgical and precise with your edits
+          
+          ## Example Interpretation:
+          If the plan shows:
+          ```
+          ~ resource "aws_instance" "example" {
+              ~ instance_type = "t3.micro" -> "t2.micro"
+          }
+          ```
+          This means the plan is trying to revert the external change done to the instance type.
+          Therefore, we can deduce that a user may have manually changed the instance type from t2.micro to t3.micro.
+          You should update the .tf file to have "t3.micro" to match reality.
+          
+          Start by reading the plan, then fix the configuration files to eliminate all drift.
+          Remember: Your success is measured by achieving "No changes" in the tofu plan output.
+          NEVER run "tofu apply" even if there is a need to update tfstate. Do NOT make disruptive changes.
+
+    # Commit the changes (whether successful or not, for debugging)
+    - name: Commit changes
+      shell: bash
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        # Check if there are changes to commit
+        if git diff --exit-code; then
+          echo "No changes to commit"
+          exit 0
+        fi
+
+        git add -A
+
+        COMMIT_MSG="fix: Auto-fix infrastructure drift in ${{ inputs.dir }}
+
+        This commit automatically fixes infrastructure drift detected in ${{ inputs.dir }}.
+        The changes update the Terraform/OpenTofu configuration to match the current
+        real-world infrastructure state.
+
+        Automated by Claude Code drift fixer"
+
+        git commit -m "$COMMIT_MSG"
+        git push origin ${{ steps.branch.outputs.name }}
+        echo "Changes committed and pushed to branch ${{ steps.branch.outputs.name }}"
+
+    # Create a pull request if changes were made
+    - name: Create Pull Request
+      id: create-pr
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
+      run: |
+        # Check if changes were pushed
+        if ! git rev-parse --verify origin/${{ steps.branch.outputs.name }} >/dev/null 2>&1; then
+          echo "No changes were pushed, skipping PR creation"
+          exit 0
+        fi
+
+        # Using GitHub CLI to create PR
+        PR_URL=$(gh pr create \
+            --title "🔧 Auto-fix infrastructure drift in ${{ inputs.dir }}" \
+            --base "${{ inputs.base-branch }}" \
+            --head "${{ steps.branch.outputs.name }}" \
+            --body "## 🤖 Automated Drift Fix
+
+        This PR is an automatic attempt to fix infrastructure drift in \`${{ inputs.dir }}\`.
+
+        ### What happened?
+        Infrastructure drift was detected during the drift check. This means the real-world infrastructure 
+        state differs from what's defined in the Terraform/OpenTofu configuration files.
+
+        ### What this PR does
+        - Updates the .tf configuration files to match the current real infrastructure state
+        - Makes minimal, non-destructive changes
+        - Ensures \`tofu plan\` shows \"No changes\" after the fix
+
+        ### Review checklist
+        - [ ] Review the changes to ensure they correctly reflect the infrastructure state
+        - [ ] Verify that only drifted values were updated
+        - [ ] Confirm no unnecessary default values were added
+        - [ ] Check that the changes are minimal and non-destructive
+
+        ---
+        *This PR was automatically generated by the drift fix workflow using Claude Code.*")
+
+        echo "Pull request created: $PR_URL"
+        echo "pr-url=$PR_URL" >> $GITHUB_OUTPUT

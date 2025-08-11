@@ -32,22 +32,32 @@ on:
         required: false
 
       drift-notify-webhook:
-        description: Slack webhook URL for drift notification
-        required: true
+        description: Slack webhook URL for drift notification (if omitted, the step fails on detecting drift)
+        required: false
+
+      github-token:
+        description: GitHub token for creating PR in automatic drift fix (optional, required for triggering workflows)
+        required: false
+      anthropic-api-key:
+        description: Anthropic API key for automatic drift fix
+        required: false
+      claude-code-oauth-token:
+        description: Claude code OAuth token for automatic drift fix
+        required: false
 
 permissions:
-  contents: read
+  contents: write
   actions: read
-  pull-requests: read
+  pull-requests: write
   id-token: write
 
 jobs:
   prepare:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - id: prepare
-        uses: gmo-media/tofu-actions/prepare@v3
+        uses: gmo-media/tofu-actions/prepare@v4
         with:
           force-all-changed: 'true'
     outputs:
@@ -61,34 +71,57 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-
-      - if: ${{ inputs.auth-mode == 'aws-cred' }}
-        uses: gmo-media/tofu-actions/setup-aws-credentials@v3
-        with:
-          aws_credentials: ${{ secrets.aws-cred }}
-      - if: ${{ inputs.auth-mode == 'aws-oidc' }}
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
-        with:
-          aws-region: ${{ inputs.aws-region }}
-          role-to-assume: ${{ inputs.aws-role }}
-      - if: ${{ inputs.auth-mode == 'gcp-oidc' }}
-        uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f # v2
-        with:
-          project_id: ${{ inputs.gcp-project }}
-          workload_identity_provider: ${{ inputs.gcp-idp }}
-
-      - uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
-        with:
-          tofu_version_file: .opentofu-version
-
-      - id: plan
-        uses: gmo-media/tofu-actions/plan@v3
+      - uses: gmo-media/tofu-actions/configure@v4
         with:
           dir: ${{ matrix.dir }}
-      - if: ${{ steps.plan.outputs.has-diff == 'true' }}
-        uses: gmo-media/tofu-actions/notify-drift@v3
+          auth-mode: ${{ inputs.auth-mode }}
+          aws-region: ${{ inputs.aws-region }}
+          aws-role: ${{ inputs.aws-role }}
+          aws-cred: ${{ secrets.aws-cred }}
+          gcp-project: ${{ inputs.gcp-project }}
+          gcp-idp: ${{ inputs.gcp-idp }}
+
+      - id: plan
+        uses: gmo-media/tofu-actions/plan@v4
+        with:
+          dir: ${{ matrix.dir }}
+
+      # NOTE: "if" condition cannot reference "secrets" directly, so use shell steps as a workaround
+      - id: check-webhook
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.drift-notify-webhook }}" ]; then
+            echo "do-notify=true" >> $GITHUB_OUTPUT
+          else
+            echo "do-notify=false" >> $GITHUB_OUTPUT
+          fi
+      - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'true' }}
+        uses: gmo-media/tofu-actions/notify-drift@v4
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
           webhook: ${{ secrets.drift-notify-webhook }}
+
+      - id: check-auto-fix
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.anthropic-api-key }}" ] || [ -n "${{ secrets.claude-code-oauth-token }}" ]; then
+            echo "do-auto-fix=true" >> $GITHUB_OUTPUT
+          else
+            echo "do-auto-fix=false" >> $GITHUB_OUTPUT
+          fi
+      - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-auto-fix.outputs.do-auto-fix == 'true' }}
+        uses: gmo-media/tofu-actions/drift-fix-claude@v4
+        with:
+          dir: ${{ matrix.dir }}
+          plan: ${{ steps.plan.outputs.plan }}
+          github-token: ${{ secrets.github-token }}
+          anthropic-api-key: ${{ secrets.claude-api-key }}
+          claude-code-oauth-token: ${{ secrets.claude-code-oauth-token }}
+
+      # Simply fail to notify the user if no webhook is given
+      - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'false' }}
+        shell: bash
+        run: |
+          echo "Drift detected in ${{ matrix.dir }}."
+          exit 1

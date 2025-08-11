@@ -36,10 +36,6 @@ on:
         description: AWS credentials (required when auth-mode is aws-cred)
         required: false
 
-      drift-notify-webhook:
-        description: Slack webhook URL for drift notification
-        required: true
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: false
@@ -54,7 +50,7 @@ jobs:
   format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
         with:
           tofu_version_file: .opentofu-version
@@ -64,9 +60,9 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - id: prepare
-        uses: gmo-media/tofu-actions/prepare@v3
+        uses: gmo-media/tofu-actions/prepare@v4
     outputs:
       strategy: ${{ steps.prepare.outputs.strategy }}
       merged-pr-run-id: ${{ steps.prepare.outputs.merged-pr-run-id }}
@@ -81,28 +77,17 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-
-      - if: ${{ inputs.auth-mode == 'aws-cred' }}
-        uses: gmo-media/tofu-actions/setup-aws-credentials@v3
+      - uses: gmo-media/tofu-actions/configure@v4
         with:
-          aws_credentials: ${{ secrets.aws-cred }}
-      - if: ${{ inputs.auth-mode == 'aws-oidc' }}
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
-        with:
+          dir: ${{ matrix.dir }}
+          auth-mode: ${{ inputs.auth-mode }}
           aws-region: ${{ inputs.aws-region }}
-          role-to-assume: ${{ inputs.aws-plan-role }}
-      - if: ${{ inputs.auth-mode == 'gcp-oidc' }}
-        uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f # v2
-        with:
-          project_id: ${{ inputs.gcp-project }}
-          workload_identity_provider: ${{ inputs.gcp-idp }}
+          aws-role: ${{ inputs.aws-plan-role }}
+          aws-cred: ${{ secrets.aws-cred }}
+          gcp-project: ${{ inputs.gcp-project }}
+          gcp-idp: ${{ inputs.gcp-idp }}
 
-      - uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
-        with:
-          tofu_version_file: .opentofu-version
-
-      - uses: gmo-media/tofu-actions/plan@v3
+      - uses: gmo-media/tofu-actions/plan@v4
         with:
           dir: ${{ matrix.dir }}
 
@@ -112,7 +97,7 @@ jobs:
     name: Plan comment
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/plan-comment@v3
+      - uses: gmo-media/tofu-actions/plan-comment@v4
 
   apply:
     needs: [ prepare ]
@@ -124,70 +109,17 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-
-      - if: ${{ inputs.auth-mode == 'aws-cred' }}
-        uses: gmo-media/tofu-actions/setup-aws-credentials@v3
+      - uses: gmo-media/tofu-actions/configure@v4
         with:
-          aws_credentials: ${{ secrets.aws-cred }}
-      - if: ${{ inputs.auth-mode == 'aws-oidc' }}
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
-        with:
+          dir: ${{ matrix.dir }}
+          auth-mode: ${{ inputs.auth-mode }}
           aws-region: ${{ inputs.aws-region }}
-          role-to-assume: ${{ inputs.aws-apply-role }}
-      - if: ${{ inputs.auth-mode == 'gcp-oidc' }}
-        uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f # v2
-        with:
-          project_id: ${{ inputs.gcp-project }}
-          workload_identity_provider: ${{ inputs.gcp-idp }}
+          aws-role: ${{ inputs.aws-apply-role }}
+          aws-cred: ${{ secrets.aws-cred }}
+          gcp-project: ${{ inputs.gcp-project }}
+          gcp-idp: ${{ inputs.gcp-idp }}
 
-      - uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
-        with:
-          tofu_version_file: .opentofu-version
-
-      - uses: gmo-media/tofu-actions/apply@v3
+      - uses: gmo-media/tofu-actions/apply@v4
         with:
           dir: ${{ matrix.dir }}
           run-id: ${{ needs.prepare.outputs.merged-pr-run-id }}
-
-  drift-check:
-    needs: [ prepare ]
-    name: Drift check (${{ matrix.dir }})
-    if: ${{ github.event_name == 'push' && needs.prepare.outputs.strategy != '[]' && needs.prepare.outputs.merged-pr-run-id == '' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-
-      - if: ${{ inputs.auth-mode == 'aws-cred' }}
-        uses: gmo-media/tofu-actions/setup-aws-credentials@v3
-        with:
-          aws_credentials: ${{ secrets.aws-cred }}
-      - if: ${{ inputs.auth-mode == 'aws-oidc' }}
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
-        with:
-          aws-region: ${{ inputs.aws-region }}
-          role-to-assume: ${{ inputs.aws-plan-role }}
-      - if: ${{ inputs.auth-mode == 'gcp-oidc' }}
-        uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f # v2
-        with:
-          project_id: ${{ inputs.gcp-project }}
-          workload_identity_provider: ${{ inputs.gcp-idp }}
-
-      - uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
-        with:
-          tofu_version_file: .opentofu-version
-
-      - id: plan
-        uses: gmo-media/tofu-actions/plan@v3
-        with:
-          dir: ${{ matrix.dir }}
-      - if: ${{ steps.plan.outputs.has-diff == 'true' }}
-        uses: gmo-media/tofu-actions/notify-drift@v3
-        with:
-          dir: ${{ matrix.dir }}
-          plan: ${{ steps.plan.outputs.plan }}
-          webhook: ${{ secrets.drift-notify-webhook }}
