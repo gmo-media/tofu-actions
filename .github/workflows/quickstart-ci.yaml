@@ -36,10 +36,6 @@ on:
         description: AWS credentials (required when auth-mode is aws-cred)
         required: false
 
-      drift-notify-webhook:
-        description: Slack webhook URL for drift notification
-        required: true
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: false
@@ -127,34 +123,3 @@ jobs:
         with:
           dir: ${{ matrix.dir }}
           run-id: ${{ needs.prepare.outputs.merged-pr-run-id }}
-
-  drift-check:
-    needs: [ prepare ]
-    name: Drift check (${{ matrix.dir }})
-    if: ${{ github.event_name == 'push' && needs.prepare.outputs.strategy != '[]' && needs.prepare.outputs.merged-pr-run-id == '' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: gmo-media/tofu-actions/configure@v3
-        with:
-          dir: ${{ matrix.dir }}
-          auth-mode: ${{ inputs.auth-mode }}
-          aws-region: ${{ inputs.aws-region }}
-          aws-role: ${{ inputs.aws-plan-role }}
-          aws-cred: ${{ secrets.aws-cred }}
-          gcp-project: ${{ inputs.gcp-project }}
-          gcp-idp: ${{ inputs.gcp-idp }}
-
-      - id: plan
-        uses: gmo-media/tofu-actions/plan@v3
-        with:
-          dir: ${{ matrix.dir }}
-      - if: ${{ steps.plan.outputs.has-diff == 'true' }}
-        uses: gmo-media/tofu-actions/notify-drift@v3
-        with:
-          dir: ${{ matrix.dir }}
-          plan: ${{ steps.plan.outputs.plan }}
-          webhook: ${{ secrets.drift-notify-webhook }}

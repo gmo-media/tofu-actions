@@ -19,5 +19,3 @@ jobs:
     with:
       aws-plan-role: arn:aws:iam::0123456789:role/my-plan-role-name
       aws-apply-role: arn:aws:iam::0123456789:role/my-apply-role-name
-    secrets:
-      drift-notify-webhook: ${{ secrets.DRIFT_NOTIFY_WEBHOOK }}
