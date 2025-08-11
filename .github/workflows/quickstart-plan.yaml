@@ -45,7 +45,7 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/configure@v3
+      - uses: gmo-media/tofu-actions/configure@v4
         with:
           dir: ${{ inputs.dir }}
           auth-mode: ${{ inputs.auth-mode }}
@@ -55,6 +55,6 @@ jobs:
           gcp-project: ${{ inputs.gcp-project }}
           gcp-idp: ${{ inputs.gcp-idp }}
 
-      - uses: gmo-media/tofu-actions/plan@v3
+      - uses: gmo-media/tofu-actions/plan@v4
         with:
           dir: ${{ inputs.dir }}

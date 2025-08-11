@@ -34,7 +34,7 @@ runs:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
     - if: ${{ inputs.auth-mode == 'aws-cred' }}
-      uses: gmo-media/tofu-actions/setup-aws-credentials@v3
+      uses: gmo-media/tofu-actions/setup-aws-credentials@v4
       with:
         aws_credentials: ${{ inputs.aws-cred }}
     - if: ${{ inputs.auth-mode == 'aws-oidc' }}

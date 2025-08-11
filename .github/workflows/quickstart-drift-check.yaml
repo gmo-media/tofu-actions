@@ -54,7 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - id: prepare
-        uses: gmo-media/tofu-actions/prepare@v3
+        uses: gmo-media/tofu-actions/prepare@v4
         with:
           force-all-changed: 'true'
     outputs:
@@ -68,7 +68,7 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/configure@v3
+      - uses: gmo-media/tofu-actions/configure@v4
         with:
           dir: ${{ matrix.dir }}
           auth-mode: ${{ inputs.auth-mode }}
@@ -79,11 +79,11 @@ jobs:
           gcp-idp: ${{ inputs.gcp-idp }}
 
       - id: plan
-        uses: gmo-media/tofu-actions/plan@v3
+        uses: gmo-media/tofu-actions/plan@v4
         with:
           dir: ${{ matrix.dir }}
       - if: ${{ steps.plan.outputs.has-diff == 'true' }}
-        uses: gmo-media/tofu-actions/notify-drift@v3
+        uses: gmo-media/tofu-actions/notify-drift@v4
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
@@ -92,7 +92,7 @@ jobs:
       - if: |
          needs.drift-check.outputs.has-diff == 'true' &&
          (inputs.anthropic-api-key != '' || inputs.claude-code-oauth-token != '')
-        uses: gmo-media/tofu-actions/configure@v3
+        uses: gmo-media/tofu-actions/configure@v4
         with:
           dir: ${{ matrix.dir }}
           auth-mode: ${{ inputs.auth-mode }}
@@ -102,7 +102,7 @@ jobs:
           gcp-project: ${{ inputs.gcp-project }}
           gcp-idp: ${{ inputs.gcp-idp }}
 
-      - uses: gmo-media/tofu-actions/drift-fix-claude@v3
+      - uses: gmo-media/tofu-actions/drift-fix-claude@v4
         with:
           dir: ${{ inputs.dir }}
           plan: ${{ needs.drift-check.outputs.plan }}

@@ -62,7 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - id: prepare
-        uses: gmo-media/tofu-actions/prepare@v3
+        uses: gmo-media/tofu-actions/prepare@v4
     outputs:
       strategy: ${{ steps.prepare.outputs.strategy }}
       merged-pr-run-id: ${{ steps.prepare.outputs.merged-pr-run-id }}
@@ -77,7 +77,7 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/configure@v3
+      - uses: gmo-media/tofu-actions/configure@v4
         with:
           dir: ${{ matrix.dir }}
           auth-mode: ${{ inputs.auth-mode }}
@@ -87,7 +87,7 @@ jobs:
           gcp-project: ${{ inputs.gcp-project }}
           gcp-idp: ${{ inputs.gcp-idp }}
 
-      - uses: gmo-media/tofu-actions/plan@v3
+      - uses: gmo-media/tofu-actions/plan@v4
         with:
           dir: ${{ matrix.dir }}
 
@@ -97,7 +97,7 @@ jobs:
     name: Plan comment
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/plan-comment@v3
+      - uses: gmo-media/tofu-actions/plan-comment@v4
 
   apply:
     needs: [ prepare ]
@@ -109,7 +109,7 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/configure@v3
+      - uses: gmo-media/tofu-actions/configure@v4
         with:
           dir: ${{ matrix.dir }}
           auth-mode: ${{ inputs.auth-mode }}
@@ -119,7 +119,7 @@ jobs:
           gcp-project: ${{ inputs.gcp-project }}
           gcp-idp: ${{ inputs.gcp-idp }}
 
-      - uses: gmo-media/tofu-actions/apply@v3
+      - uses: gmo-media/tofu-actions/apply@v4
         with:
           dir: ${{ matrix.dir }}
           run-id: ${{ needs.prepare.outputs.merged-pr-run-id }}

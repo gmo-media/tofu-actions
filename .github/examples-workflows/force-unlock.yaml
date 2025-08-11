@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   force-unlock:
-    uses: gmo-media/tofu-actions/.github/workflows/quickstart-force-unlock.yaml@v3
+    uses: gmo-media/tofu-actions/.github/workflows/quickstart-force-unlock.yaml@v4
     with:
       aws-role: arn:aws:iam::0123456789:role/my-apply-role-name
       dir: ${{ inputs.dir }}

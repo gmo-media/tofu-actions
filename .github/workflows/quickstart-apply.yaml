@@ -50,7 +50,7 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/configure@v3
+      - uses: gmo-media/tofu-actions/configure@v4
         with:
           dir: ${{ inputs.dir }}
           auth-mode: ${{ inputs.auth-mode }}
@@ -60,7 +60,7 @@ jobs:
           gcp-project: ${{ inputs.gcp-project }}
           gcp-idp: ${{ inputs.gcp-idp }}
 
-      - uses: gmo-media/tofu-actions/apply@v3
+      - uses: gmo-media/tofu-actions/apply@v4
         with:
           dir: ${{ inputs.dir }}
           run-id: ${{ inputs.run-id }}
