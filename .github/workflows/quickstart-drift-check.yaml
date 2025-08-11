@@ -43,7 +43,7 @@ on:
         required: false
 
 permissions:
-  contents: read
+  contents: write
   actions: read
   pull-requests: write
   id-token: write
