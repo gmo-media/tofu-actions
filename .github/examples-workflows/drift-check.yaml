@@ -17,8 +17,9 @@ jobs:
     uses: gmo-media/tofu-actions/.github/workflows/quickstart-drift-check.yaml@v4
     with:
       aws-role: arn:aws:iam::0123456789:role/my-plan-role-name
-    secrets:
-      drift-notify-webhook: ${{ secrets.DRIFT_NOTIFY_WEBHOOK }}
+    # secrets:
+      # For Slack notification
+      # drift-notify-webhook: ${{ secrets.DRIFT_NOTIFY_WEBHOOK }}
       # For automatic drift fix
       # anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
       # claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

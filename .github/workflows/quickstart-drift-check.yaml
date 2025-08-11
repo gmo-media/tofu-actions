@@ -32,8 +32,8 @@ on:
         required: false
 
       drift-notify-webhook:
-        description: Slack webhook URL for drift notification
-        required: true
+        description: Slack webhook URL for drift notification (if omitted, the step fails on detecting drift)
+        required: false
 
       anthropic-api-key:
         description: Anthropic API key for automatic drift fix
@@ -82,7 +82,8 @@ jobs:
         uses: gmo-media/tofu-actions/plan@v4
         with:
           dir: ${{ matrix.dir }}
-      - if: ${{ steps.plan.outputs.has-diff == 'true' }}
+
+      - if: ${{ steps.plan.outputs.has-diff == 'true' && inputs.drift-notify-webhook != '' }}
         uses: gmo-media/tofu-actions/notify-drift@v4
         with:
           dir: ${{ matrix.dir }}
@@ -98,3 +99,10 @@ jobs:
           plan: ${{ needs.drift-check.outputs.plan }}
           anthropic-api-key: ${{ secrets.claude-api-key }}
           claude-code-oauth-token: ${{ secrets.claude-code-oauth-token }}
+
+      # Simply fail to notify the user if no webhook is given
+      - if: ${{ steps.plan.outputs.has-diff == 'true' && inputs.drift-notify-webhook == '' }}
+        shell: bash
+        run: |
+          echo "Drift detected in ${{ matrix.dir }}."
+          exit 1
