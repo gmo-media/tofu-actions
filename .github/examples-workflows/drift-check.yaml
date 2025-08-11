@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
   actions: read
-  pull-requests: read
+  pull-requests: write
   id-token: write
 
 jobs:
@@ -19,3 +19,6 @@ jobs:
       aws-role: arn:aws:iam::0123456789:role/my-plan-role-name
     secrets:
       drift-notify-webhook: ${{ secrets.DRIFT_NOTIFY_WEBHOOK }}
+      # For automatic drift fix
+      # anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+      # claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
