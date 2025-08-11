@@ -53,7 +53,7 @@ runs:
     - name: Fix drift with Claude Code
       shell: bash
       run: |
-        claude -p --dangerously-skip-permissions "$PROMPT"
+        claude -p --verbose --output-format stream-json --dangerously-skip-permissions "$PROMPT"
       env:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
