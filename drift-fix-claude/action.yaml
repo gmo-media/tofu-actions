@@ -28,14 +28,6 @@ outputs:
 runs:
   using: composite
   steps:
-    - working-directory: ${{ inputs.dir }}
-      shell: bash
-      run: tofu init --reconfigure
-
-    - working-directory: ${{ inputs.dir }}
-      shell: bash
-      run: tofu validate
-
     # Create a new branch for the fix
     - name: Create fix branch
       id: branch

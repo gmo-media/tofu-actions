@@ -11,14 +11,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - working-directory: ${{ inputs.dir }}
-      shell: bash
-      run: tofu init --reconfigure
-
-    - working-directory: ${{ inputs.dir }}
-      shell: bash
-      run: tofu validate
-
     - name: Sanitize artifact name
       id: artifact-name
       shell: bash
