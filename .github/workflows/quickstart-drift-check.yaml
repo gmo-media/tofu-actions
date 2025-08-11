@@ -110,8 +110,8 @@ jobs:
       - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-auto-fix.outputs.do-auto-fix == 'true' }}
         uses: gmo-media/tofu-actions/drift-fix-claude@v4
         with:
-          dir: ${{ inputs.dir }}
-          plan: ${{ needs.drift-check.outputs.plan }}
+          dir: ${{ matrix.dir }}
+          plan: ${{ steps.plan.outputs.plan }}
           anthropic-api-key: ${{ secrets.claude-api-key }}
           claude-code-oauth-token: ${{ secrets.claude-code-oauth-token }}
 
