@@ -6,9 +6,16 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  id-token: write
+
 jobs:
   drift-check:
-    uses: gmo-media/tofu-actions/.github/workflows/quickstart-drift-check.yaml@v2
+    uses: gmo-media/tofu-actions/.github/workflows/quickstart-drift-check.yaml@v3
     with:
       aws-role: arn:aws:iam::0123456789:role/my-plan-role-name
-      drift-notify-webhook: "https://hooks.slack.com/..."
+    secrets:
+      drift-notify-webhook: ${{ secrets.DRIFT_NOTIFY_WEBHOOK }}

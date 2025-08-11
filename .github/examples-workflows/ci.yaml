@@ -7,10 +7,17 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+  id-token: write
+
 jobs:
   ci:
-    uses: gmo-media/tofu-actions/.github/workflows/quickstart-ci.yaml@v2
+    uses: gmo-media/tofu-actions/.github/workflows/quickstart-ci.yaml@v3
     with:
       aws-plan-role: arn:aws:iam::0123456789:role/my-plan-role-name
       aws-apply-role: arn:aws:iam::0123456789:role/my-apply-role-name
-      drift-notify-webhook: "https://hooks.slack.com/..."
+    secrets:
+      drift-notify-webhook: ${{ secrets.DRIFT_NOTIFY_WEBHOOK }}
