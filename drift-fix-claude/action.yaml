@@ -63,7 +63,6 @@ runs:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
         PROMPT: |
-          cat <<EOF > /tmp/prompt.txt
           # CRITICAL INSTRUCTIONS FOR FIXING INFRASTRUCTURE DRIFT
           You have been given a critical task to fix infrastructure drift in Terraform/OpenTofu configuration files.
           Your goal is to update the .tf files to match the current real-world infrastructure state.
