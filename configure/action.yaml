@@ -41,7 +41,7 @@ runs:
       uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
       with:
         aws-region: ${{ inputs.aws-region }}
-        role-to-assume: ${{ inputs.aws-plan-role }}
+        role-to-assume: ${{ inputs.aws-role }}
     - if: ${{ inputs.auth-mode == 'gcp-oidc' }}
       uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f # v2
       with:
