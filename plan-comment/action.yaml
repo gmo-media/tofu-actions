@@ -28,9 +28,9 @@ runs:
         fi
 
         if [ "$found" = true ]; then
-          echo 'These plan(s) will be applied automatically upon merging this PR.' >> /tmp/comment.txt
+          echo 'These plans will be automatically applied upon merging this PR.' >> /tmp/comment.txt
           echo '' >> /tmp/comment.txt
-          echo 'To manually apply these plan(s), visit' >> /tmp/comment.txt
+          echo 'To manually apply these plans, visit' >> /tmp/comment.txt
           echo '${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}' >> /tmp/comment.txt
           echo 'and fill `${{ github.run_id }}` to run_id parameter.' >> /tmp/comment.txt
         fi
@@ -64,11 +64,14 @@ runs:
         message-failure: Plan was not successful
         message: |
           ## Plan
+
           Plan result was too long (> 50k chars) to include in PR comment.
           Please check actions summary for more info.
           ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          To manually apply these plan(s), visit
+
+          These plans will be automatically applied upon merging this PR.
+
+          To manually apply these plans, visit
           ${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}
           and fill `${{ github.run_id }}` to run_id parameter.
 
