@@ -95,13 +95,6 @@ jobs:
           else
             echo "do-notify=false" >> $GITHUB_OUTPUT
           fi
-      - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'true' }}
-        uses: gmo-media/tofu-actions/notify-drift@v4
-        with:
-          dir: ${{ matrix.dir }}
-          plan: ${{ steps.plan.outputs.plan }}
-          webhook: ${{ secrets.drift-notify-webhook }}
-
       - id: check-auto-fix
         shell: bash
         run: |
@@ -110,6 +103,15 @@ jobs:
           else
             echo "do-auto-fix=false" >> $GITHUB_OUTPUT
           fi
+
+      - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'true' }}
+        uses: gmo-media/tofu-actions/notify-drift@v4
+        with:
+          dir: ${{ matrix.dir }}
+          plan: ${{ steps.plan.outputs.plan }}
+          additional-message: ${{ steps.check-auto-fix.outputs.do-auto-fix == 'true' && 'Claude is on the way to creating a PR...' || 'Please review the changes and fix manually.' }}
+          webhook: ${{ secrets.drift-notify-webhook }}
+
       - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-auto-fix.outputs.do-auto-fix == 'true' }}
         uses: gmo-media/tofu-actions/drift-fix-claude@v4
         with:

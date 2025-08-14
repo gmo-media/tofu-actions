@@ -7,6 +7,10 @@ inputs:
   plan:
     description: Plan string
     required: true
+  additional-message:
+    description: Additional message to include in the drift notification
+    default: >-
+      Please review the changes and fix manually.
   webhook:
     description: Slack incoming-webhook URL
     required: true
@@ -47,7 +51,7 @@ runs:
             - type: "section"
               text:
                 type: "mrkdwn"
-                text: "*Action Required:*\nInfrastructure drift has been detected. Please review the changes and apply the plan if necessary."
+                text: "*Action Required:*\nInfrastructure drift has been detected. ${{ inputs.additional-message }}"
             - type: "section"
               text:
                 type: "mrkdwn"
