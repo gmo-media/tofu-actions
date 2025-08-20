@@ -54,6 +54,15 @@ runs:
         mkdir -p ~/.config/git
         echo "gha-creds-*.json" >> ~/.config/git/ignore
 
+    - name: Copy .github/aws-config if it exists in repository
+      shell: bash
+      run: |
+        if [ -f .github/aws-config ]; then
+          echo ".github/aws-config found in repository, copying to ~/.aws/config"
+          mkdir -p ~/.aws
+          cp .github/aws-config ~/.aws/config
+        fi
+
     - uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
       with:
         tofu_version_file: .opentofu-version
