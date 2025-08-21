@@ -10,10 +10,8 @@
     'github>gmo-media/tofu-actions//.github/renovate/minimum-release-age.json5',
     'github>gmo-media/tofu-actions//.github/renovate/pin-digest.json5',
   ],
-  platform: 'github',
   platformAutomerge: true,
   automergeType: 'pr',
-  onboarding: false,
   dependencyDashboardTitle: 'Renovate Dashboard 🤖',
   suppressNotifications: [
     'prIgnoreNotification',
