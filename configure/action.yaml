@@ -6,25 +6,28 @@ inputs:
     required: true
 
   auth-mode:
-    description: Authentication mode (aws-oidc, aws-cred (deprecated), or gcp-oidc)
+    description: >-
+      Authentication mode.
+      Activate multiple modes by separating them with spaces.
+      Possible values: aws-oidc (default), aws-cred (deprecated), gcp-oidc
     default: aws-oidc
 
   aws-region:
-    description: AWS region (required when auth-mode is aws-oidc)
+    description: AWS region (required when auth-mode contains aws-oidc)
     default: ap-northeast-1
   aws-role:
     description: >-
-      AWS role to assume (required when auth-mode is aws-oidc)
+      AWS role to assume (required when auth-mode contains aws-oidc)
       e.g. arn:aws:iam::0123456789:role/my-plan-role-name
 
   aws-cred:
-    description: AWS credentials (required when auth-mode is aws-cred)
+    description: AWS credentials (required when auth-mode contains aws-cred)
 
   gcp-project:
-    description: GCP project ID (required when auth-mode is gcp-oidc)
+    description: GCP project ID (required when auth-mode contains gcp-oidc)
   gcp-idp:
     description: >-
-      GCP workload identity provider (required when auth-mode is gcp-oidc)
+      GCP workload identity provider (required when auth-mode contains gcp-oidc)
       e.g. projects/0123456789/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
 
 runs:
@@ -33,21 +36,21 @@ runs:
     # Checkout is required before google-github-actions/auth
     - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
 
-    - if: ${{ inputs.auth-mode == 'aws-cred' }}
+    - if: ${{ contains(inputs.auth-mode, 'aws-cred') }}
       uses: gmo-media/tofu-actions/setup-aws-credentials@v4
       with:
         aws_credentials: ${{ inputs.aws-cred }}
-    - if: ${{ inputs.auth-mode == 'aws-oidc' }}
+    - if: ${{ contains(inputs.auth-mode, 'aws-oidc') }}
       uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
       with:
         aws-region: ${{ inputs.aws-region }}
         role-to-assume: ${{ inputs.aws-role }}
-    - if: ${{ inputs.auth-mode == 'gcp-oidc' }}
+    - if: ${{ contains(inputs.auth-mode, 'gcp-oidc') }}
       uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f # v2
       with:
         project_id: ${{ inputs.gcp-project }}
         workload_identity_provider: ${{ inputs.gcp-idp }}
-    - if: ${{ inputs.auth-mode == 'gcp-oidc' }}
+    - if: ${{ contains(inputs.auth-mode, 'gcp-oidc') }}
       name: Ignore generated credentials from google-github-actions/auth
       shell: bash
       run: |
