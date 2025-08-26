@@ -11,6 +11,8 @@ tailored for specific needs:
 For more advanced features or battle-tested solutions,
 we recommend checking out suzuki-shunsuke/tfaction.
 
+See also: [infra-template](https://github.com/gmo-media/infra-template)
+
 ## Getting Started
 
 ### Setting up your configuration
