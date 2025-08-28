@@ -1,15 +1,17 @@
 # tofu-actions
 
 A collection of reusable GitHub Actions and workflows for OpenTofu that makes infrastructure automation simple.
-This project provides a lighter alternative to [suzuki-shunsuke/tfaction](https://github.com/suzuki-shunsuke/tfaction),
-tailored for specific needs:
+This project aims to be a simple, opinionated, and easy-to-setup workflow, tailored for specific needs:
 
 - Built exclusively for OpenTofu (Terraform not supported yet)
 - Works great with monorepos (manage multiple infrastructure directories in one repository)
 - Supports local modules within your repository
 
-For more advanced features or battle-tested solutions,
-we recommend checking out suzuki-shunsuke/tfaction.
+For more advanced features or battle-tested solutions, we recommend checking out:
+- [shuaibiyy/awesome-tf](https://github.com/shuaibiyy/awesome-tf)
+- [suzuki-shunsuke/tfaction](https://github.com/suzuki-shunsuke/tfaction)
+- [OP5dev/TF-via-PR](https://github.com/OP5dev/TF-via-PR)
+- [dflook/terraform-github-actions](https://github.com/dflook/terraform-github-actions)
 
 See also: [infra-template](https://github.com/gmo-media/infra-template)
 
