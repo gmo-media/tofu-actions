@@ -65,13 +65,13 @@ runs:
         echo '${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}' >> $GITHUB_STEP_SUMMARY
         echo 'and fill `${{ github.run_id }}` to run_id parameter.' >> $GITHUB_STEP_SUMMARY
 
-        # NOTE: For some reason, opentofu never exits with exit code 2 (which means diff was detected),
-        # so we're checking the "No changes" string in /tmp/plan.txt to detect drift for now.
-        echo "tofu plan exit code: $PLAN_EXIT_CODE"
-        if grep -q "No changes. Your infrastructure matches the configuration." /tmp/plan.txt; then
+        if [ $PLAN_EXIT_CODE -eq 0 ]; then
           echo "has-diff=false" >> $GITHUB_OUTPUT
-        else
+        else if [ $PLAN_EXIT_CODE -eq 2 ]; then
           echo "has-diff=true" >> $GITHUB_OUTPUT
+        else
+          echo "Unexpected exit code: $PLAN_EXIT_CODE"
+          exit 1
         fi
 
     - name: Upload plan text

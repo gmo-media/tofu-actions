@@ -57,6 +57,7 @@ jobs:
       - uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
         with:
           tofu_version_file: .opentofu-version
+          tofu_wrapper: 'false'
 
       - run: tofu fmt -recursive -check
 
