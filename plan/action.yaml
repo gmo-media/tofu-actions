@@ -67,7 +67,7 @@ runs:
 
         if [ $PLAN_EXIT_CODE -eq 0 ]; then
           echo "has-diff=false" >> $GITHUB_OUTPUT
-        else if [ $PLAN_EXIT_CODE -eq 2 ]; then
+        elif [ $PLAN_EXIT_CODE -eq 2 ]; then
           echo "has-diff=true" >> $GITHUB_OUTPUT
         else
           echo "Unexpected exit code: $PLAN_EXIT_CODE"
