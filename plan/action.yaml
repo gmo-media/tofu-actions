@@ -35,7 +35,7 @@ runs:
         set -o pipefail
 
         set +o pipefail
-        tofu plan -concise -detailed-exitcode -out /tmp/tofu.plan | tee /tmp/plan-raw.txt
+        tofu plan -lock-timeout=300s -concise -detailed-exitcode -out /tmp/tofu.plan | tee /tmp/plan-raw.txt
         PLAN_EXIT_CODE=${PIPESTATUS[0]}
         set -o pipefail
         # Exit code 1 means execution error, so fail the step
