@@ -4,6 +4,11 @@ inputs:
   apply_workflow_id:
     description: Workflow ID (filename) to apply plans
     default: apply.yaml
+  force-fail:
+    description: >-
+      If true, this step will fail.
+      Useful for combining with GitHub branch ruleset enforcing status checks, since "skipped" job counts as success.
+    default: 'false'
 
 runs:
   using: composite
@@ -82,3 +87,8 @@ runs:
         message-id: plan-${{ github.event.pull_request.number }}
         message-failure: Plan was not successful
         message: ${{ steps.composite.outputs.comment }}
+
+    - if: ${{ inputs.force-fail == 'true' }}
+      name: Force fail
+      shell: bash
+      run: exit 1

@@ -97,11 +97,13 @@ jobs:
 
   plan-comment:
     needs: [ prepare, plan ]
-    if: ${{ github.event_name == 'pull_request' }}
+    if: ${{ always() && github.event_name == 'pull_request' }}
     name: Plan comment
     runs-on: ubuntu-latest
     steps:
       - uses: gmo-media/tofu-actions/plan-comment@v4
+        with:
+          force-fail: ${{ failure() || cancelled() }} # Make this job fail if dependencies failed
 
   apply:
     needs: [ prepare ]
