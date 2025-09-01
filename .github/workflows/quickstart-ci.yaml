@@ -103,7 +103,7 @@ jobs:
     steps:
       - uses: gmo-media/tofu-actions/plan-comment@v4
         with:
-          force-fail: ${{ failure() || cancelled() }} # Make this job fail if dependencies failed
+          force-fail: ${{ contains(needs.*.result, 'failure') }} # Make this job fail if dependencies failed
 
   apply:
     needs: [ prepare ]
