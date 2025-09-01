@@ -97,7 +97,7 @@ jobs:
 
   plan-comment:
     needs: [ prepare, plan ]
-    if: ${{ always() && github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'pull_request' }}
     name: Plan comment
     runs-on: ubuntu-latest
     steps:
