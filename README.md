@@ -43,3 +43,15 @@ Copy the workflow examples from `.github/example-workflows/` to your repository'
 The `.github/workflows/quickstart-*.yaml` files are ready-to-use opinionated workflows that you can call from other workflows.
 They help you get started quickly without writing much code.
 If you need something more custom, copy the workflow content and adjust it to your needs.
+
+### Recommended Branch Ruleset
+
+We recommend importing [recommended-ruleset.json](.github/recommended-ruleset.json) to your repository (Settings -> Rules -> Rulesets -> Import a ruleset).
+
+The most important rules here are:
+- Require a pull request before merging
+- Require status checks to pass before merging (`ci / Plan comment`)
+    - Require branches to be up to date before merging
+
+Since applying requires a plan with the *latest* tfstate,
+we recommend this ruleset to ensure that the plan on PR is always up to date.
