@@ -91,4 +91,4 @@ runs:
     - if: ${{ inputs.force-fail == 'true' }}
       name: Force fail
       shell: bash
-      run: exit 1
+      run: echo "Force-fail input is true, so I'm making this step fail. Perhaps some plans have failed?" && exit 1
