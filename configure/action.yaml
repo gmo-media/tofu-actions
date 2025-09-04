@@ -46,7 +46,7 @@ runs:
         aws-region: ${{ inputs.aws-region }}
         role-to-assume: ${{ inputs.aws-role }}
     - if: ${{ contains(inputs.auth-mode, 'gcp-oidc') }}
-      uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+      uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
       with:
         project_id: ${{ inputs.gcp-project }}
         workload_identity_provider: ${{ inputs.gcp-idp }}
