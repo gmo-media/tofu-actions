@@ -108,13 +108,17 @@ jobs:
   apply:
     needs: [ prepare ]
     name: Apply (${{ matrix.dir }})
-    if: ${{ github.event_name == 'push' && needs.prepare.outputs.strategy != '[]' && needs.prepare.outputs.merged-pr-run-id != '' }}
+    if: ${{ github.event_name == 'push' && needs.prepare.outputs.strategy != '[]' }}
     strategy:
       fail-fast: false
       matrix:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
+      - if: ${{ needs.prepare.outputs.merged-pr-run-id == '' }}
+        name: Fail if no plan found
+        run: echo "We wanted to auto-apply a plan generated in PR, but we could not find one. Perhaps the PR workflow failed?" && exit 1
+
       - uses: gmo-media/tofu-actions/configure@v4
         with:
           dir: ${{ matrix.dir }}

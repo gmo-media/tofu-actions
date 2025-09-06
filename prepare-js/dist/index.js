@@ -31350,14 +31350,13 @@ const run = async () => {
         const workflowId = coreExports.getInput('workflow-id') || `${await getSelfWorkflowId()}`;
         console.log(`[prepare] Looking up latest run of workflow ${workflowId} ...`);
         const latestRunId = await getLatestRunId(pr.head.sha, workflowId);
-        if (!latestRunId) {
-            // Always assume that the PR runs the workflow - otherwise, assume that the workflow in the PR has failed.
-            // If so, notify the user by failing this workflow.
-            coreExports.setFailed(`[prepare] No run found for workflow ${workflowId} in PR #${pr.number}. Perhaps the workflow has failed?`);
-            return;
+        if (latestRunId) {
+            console.log(`[prepare] Latest run #${latestRunId} found for workflow ${workflowId} in PR #${pr.number}`);
+            coreExports.setOutput('merged-pr-run-id', latestRunId);
         }
-        console.log(`[prepare] Latest run #${latestRunId} found for workflow ${workflowId} in PR #${pr.number}`);
-        coreExports.setOutput('merged-pr-run-id', latestRunId);
+        else {
+            console.log(`[prepare] No run found for workflow ${workflowId} in PR #${pr.number}.`);
+        }
     }
 };
 run().catch(err => {
