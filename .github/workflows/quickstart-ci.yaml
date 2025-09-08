@@ -69,6 +69,7 @@ jobs:
         uses: gmo-media/tofu-actions/prepare@v4
     outputs:
       strategy: ${{ steps.prepare.outputs.strategy }}
+      merged-pr-number: ${{ steps.prepare.outputs.merged-pr-number }}
       merged-pr-run-id: ${{ steps.prepare.outputs.merged-pr-run-id }}
 
   plan:
@@ -108,7 +109,7 @@ jobs:
   apply:
     needs: [ prepare ]
     name: Apply (${{ matrix.dir }})
-    if: ${{ github.event_name == 'push' && needs.prepare.outputs.strategy != '[]' }}
+    if: ${{ github.event_name == 'push' && needs.prepare.outputs.strategy != '[]' && needs.prepare.outputs.merged-pr-number != '' }}
     strategy:
       fail-fast: false
       matrix:
