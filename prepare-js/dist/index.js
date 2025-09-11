@@ -31309,26 +31309,23 @@ const calculateRunDirs = (config) => {
     const changedFiles = fileContent ? fileContent.split(' ') : [];
     console.log(`[prepare] ${changedFiles.length} files were changed, calculating which CI to run...`);
     // Determine which CI to run
-    const isDirectChildPath = (prefix, filePath) => {
-        if (prefix.length === 0 || !filePath.startsWith(`${prefix}/`)) {
+    const isDirectoryFile = (directory, filePath) => {
+        // Special case - root directory
+        if (directory === '') {
+            return !filePath.includes('/');
+        }
+        if (!filePath.startsWith(`${directory}/`)) {
             return false;
         }
-        const relativePath = filePath.slice(prefix.length + 1);
+        const relativePath = filePath.slice(directory.length + 1);
         return relativePath.length > 0 && !relativePath.includes('/');
     };
-    const hasPaths = (prefixes) => {
-        for (const prefix of prefixes) {
-            if (changedFiles.some(file => isDirectChildPath(prefix, file))) {
-                return true;
-            }
-        }
-        return false;
-    };
+    const directoryHasChangedFile = (directory) => changedFiles.some(file => isDirectoryFile(directory, file));
     return config.dirs
-        .filter(dir => hasPaths([
+        .filter(dir => [
         dir,
         ...getModuleSources(dir)
-    ]));
+    ].some(directoryHasChangedFile));
 };
 const run = async () => {
     const config = await readConfig();
