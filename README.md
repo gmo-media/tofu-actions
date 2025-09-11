@@ -25,8 +25,10 @@ You must *not* put `./` at the start or `/` at the end.
 ```js
 export default {
   dirs: [
+    '', // root directory
     'dev',
     'prod',
+    'foo/bar',
   ]
 }
 ```
