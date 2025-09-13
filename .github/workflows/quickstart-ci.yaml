@@ -74,7 +74,7 @@ jobs:
           tofu_version_file: .opentofu-version
           tofu_wrapper: 'false'
 
-      - run: tofu fmt -recursive -check
+      - run: ${{ inputs.tf-binary }} fmt -recursive -check
 
   prepare:
     runs-on: ubuntu-latest
