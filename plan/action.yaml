@@ -1,6 +1,10 @@
 name: Plan
 
 inputs:
+  tf-binary:
+    description: Terraform or OpenTofu binary name
+    default: tofu
+
   dir:
     description: Directory to run in
     required: true
@@ -35,7 +39,7 @@ runs:
         set -o pipefail
 
         set +o pipefail
-        tofu plan -lock-timeout=300s -concise -detailed-exitcode -out /tmp/tofu.plan | tee /tmp/plan-raw.txt
+        ${{ inputs.tf-binary }} plan -lock-timeout=300s -concise -detailed-exitcode -out /tmp/tf.plan | tee /tmp/plan-raw.txt
         PLAN_EXIT_CODE=${PIPESTATUS[0]}
         set -o pipefail
         # Exit code 1 means execution error, so fail the step
@@ -45,11 +49,11 @@ runs:
 
         # Remove ansi colors
         </tmp/plan-raw.txt sed -e 's/\x1b\[[0-9;]*m//g' \
-          | grep -v -E "OpenTofu used the selected providers to generate the following execution|Resource actions are indicated with the following symbols" \
+          | grep -v -E "used the selected providers to generate the following execution|Resource actions are indicated with the following symbols" \
           | grep -v -E "Acquiring state lock|Reading|Still reading|Read complete after" \
-          | grep -v -E "OpenTofu has compared your real infrastructure against your configuration and|found no differences, so no changes are needed|Releasing state lock" \
+          | grep -v -E "has compared your real infrastructure against your configuration and|found no differences, so no changes are needed|Releasing state lock" \
           | grep -v -E "─────────────────────────────────────────────────────────────────────────────" \
-          | grep -v -E "Saved the plan to|To perform exactly these actions, run the following command to apply|tofu apply \"/tmp/tofu.plan\"" \
+          | grep -v -E "Saved the plan to|To perform exactly these actions, run the following command to apply|${{ inputs.tf-binary }} apply \"/tmp/tf.plan\"" \
           > /tmp/plan.txt
         cp /tmp/plan.txt /tmp/plan-${{ steps.artifact-name.outputs.name }}.txt
 
@@ -83,4 +87,4 @@ runs:
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
         name: plan-file-${{ steps.artifact-name.outputs.name }}
-        path: /tmp/tofu.plan
+        path: /tmp/tf.plan

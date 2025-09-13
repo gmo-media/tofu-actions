@@ -1,6 +1,10 @@
 name: Apply
 
 inputs:
+  tf-binary:
+    description: Terraform or OpenTofu binary name
+    default: tofu
+
   dir:
     description: Directory to run in
     required: true
@@ -29,4 +33,4 @@ runs:
     - name: Apply
       working-directory: ${{ inputs.dir }}
       shell: bash
-      run: tofu apply -lock-timeout=300s /tmp/tofu.plan
+      run: ${{ inputs.tf-binary }} apply -lock-timeout=300s /tmp/tf.plan

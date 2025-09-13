@@ -4,6 +4,15 @@ name: Drift Check
 on:
   workflow_call:
     inputs:
+      tf-binary:
+        description: Terraform or OpenTofu binary name
+        type: string
+        default: tofu
+      terraform-version:
+        description: Terraform version to use (if tf-binary is terraform)
+        type: string
+        default: latest
+
       auth-mode:
         description: >-
           Authentication mode.
@@ -76,6 +85,8 @@ jobs:
     steps:
       - uses: gmo-media/tofu-actions/configure@v4
         with:
+          tf-binary: ${{ inputs.tf-binary }}
+          terraform-version: ${{ inputs.terraform-version }}
           dir: ${{ matrix.dir }}
           auth-mode: ${{ inputs.auth-mode }}
           aws-region: ${{ inputs.aws-region }}
@@ -87,6 +98,7 @@ jobs:
       - id: plan
         uses: gmo-media/tofu-actions/plan@v4
         with:
+          tf-binary: ${{ inputs.tf-binary }}
           dir: ${{ matrix.dir }}
 
       # NOTE: "if" condition cannot reference "secrets" directly, so use shell steps as a workaround
@@ -118,6 +130,7 @@ jobs:
       - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-auto-fix.outputs.do-auto-fix == 'true' }}
         uses: gmo-media/tofu-actions/drift-fix-claude@v4
         with:
+          tf-binary: ${{ inputs.tf-binary }}
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
           github-token: ${{ secrets.github-token }}

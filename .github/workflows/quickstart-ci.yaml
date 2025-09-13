@@ -4,6 +4,15 @@ name: CI
 on:
   workflow_call:
     inputs:
+      tf-binary:
+        description: Terraform or OpenTofu binary name
+        type: string
+        default: tofu
+      terraform-version:
+        description: Terraform version to use (if tf-binary is terraform)
+        type: string
+        default: latest
+
       auth-mode:
         description: >-
           Authentication mode.
@@ -54,7 +63,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
-      - uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
+      - if: ${{ contains(inputs.tf-binary, 'terraform') }}
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: ${{ inputs.terraform-version }}
+          terraform_wrapper: false
+      - if: ${{ contains(inputs.tf-binary, 'tofu') }}
+        uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
         with:
           tofu_version_file: .opentofu-version
           tofu_wrapper: 'false'
@@ -84,6 +99,8 @@ jobs:
     steps:
       - uses: gmo-media/tofu-actions/configure@v4
         with:
+          tf-binary: ${{ inputs.tf-binary }}
+          terraform-version: ${{ inputs.terraform-version }}
           dir: ${{ matrix.dir }}
           auth-mode: ${{ inputs.auth-mode }}
           aws-region: ${{ inputs.aws-region }}
@@ -94,6 +111,7 @@ jobs:
 
       - uses: gmo-media/tofu-actions/plan@v4
         with:
+          tf-binary: ${{ inputs.tf-binary }}
           dir: ${{ matrix.dir }}
 
   plan-comment:
@@ -122,6 +140,8 @@ jobs:
 
       - uses: gmo-media/tofu-actions/configure@v4
         with:
+          tf-binary: ${{ inputs.tf-binary }}
+          terraform-version: ${{ inputs.terraform-version }}
           dir: ${{ matrix.dir }}
           auth-mode: ${{ inputs.auth-mode }}
           aws-region: ${{ inputs.aws-region }}
@@ -132,5 +152,6 @@ jobs:
 
       - uses: gmo-media/tofu-actions/apply@v4
         with:
+          tf-binary: ${{ inputs.tf-binary }}
           dir: ${{ matrix.dir }}
           run-id: ${{ needs.prepare.outputs.merged-pr-run-id }}

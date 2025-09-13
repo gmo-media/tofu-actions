@@ -5,6 +5,15 @@ run-name: Force unlock (${{ inputs.dir }})
 on:
   workflow_call:
     inputs:
+      tf-binary:
+        description: Terraform or OpenTofu binary name
+        type: string
+        default: tofu
+      terraform-version:
+        description: Terraform version to use (if tf-binary is terraform)
+        type: string
+        default: latest
+
       auth-mode:
         description: Authentication mode (aws-oidc, aws-cred (deprecated), or gcp-oidc)
         type: string
@@ -51,6 +60,8 @@ jobs:
     steps:
       - uses: gmo-media/tofu-actions/configure@v4
         with:
+          tf-binary: ${{ inputs.tf-binary }}
+          terraform-version: ${{ inputs.terraform-version }}
           dir: ${{ inputs.dir }}
           auth-mode: ${{ inputs.auth-mode }}
           aws-region: ${{ inputs.aws-region }}
@@ -60,4 +71,4 @@ jobs:
           gcp-idp: ${{ inputs.gcp-idp }}
 
       - working-directory: ${{ inputs.dir }}
-        run: tofu force-unlock -force ${{ inputs.lock-id }}
+        run: ${{ inputs.tf-binary }} force-unlock -force ${{ inputs.lock-id }}

@@ -1,11 +1,11 @@
 # tofu-actions
 
-A collection of reusable GitHub Actions and workflows for OpenTofu that makes infrastructure automation simple.
+A collection of reusable GitHub Actions and workflows for Terraform/OpenTofu that makes infrastructure automation simple.
 This project aims to be a simple, opinionated, and easy-to-setup workflow, tailored for specific needs:
 
-- Built exclusively for OpenTofu (Terraform not supported yet)
 - Works great with monorepos (manage multiple infrastructure directories in one repository)
 - Supports local modules within your repository
+- Although built primarily for OpenTofu, Terraform should work by passing `tf-binary: 'terraform'` to inputs.
 
 For more advanced features or battle-tested solutions, we recommend checking out:
 - [shuaibiyy/awesome-tf](https://github.com/shuaibiyy/awesome-tf)

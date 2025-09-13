@@ -5,6 +5,15 @@ run-name: Plan (${{ inputs.dir }})
 on:
   workflow_call:
     inputs:
+      tf-binary:
+        description: Terraform or OpenTofu binary name
+        type: string
+        default: tofu
+      terraform-version:
+        description: Terraform version to use (if tf-binary is terraform)
+        type: string
+        default: latest
+
       auth-mode:
         description: >-
           Authentication mode.
@@ -50,6 +59,8 @@ jobs:
     steps:
       - uses: gmo-media/tofu-actions/configure@v4
         with:
+          tf-binary: ${{ inputs.tf-binary }}
+          terraform-version: ${{ inputs.terraform-version }}
           dir: ${{ inputs.dir }}
           auth-mode: ${{ inputs.auth-mode }}
           aws-region: ${{ inputs.aws-region }}
@@ -60,4 +71,5 @@ jobs:
 
       - uses: gmo-media/tofu-actions/plan@v4
         with:
+          tf-binary: ${{ inputs.tf-binary }}
           dir: ${{ inputs.dir }}
