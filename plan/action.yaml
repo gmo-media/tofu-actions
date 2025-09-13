@@ -39,7 +39,7 @@ runs:
         set -o pipefail
 
         set +o pipefail
-        ${{ inputs.tf-binary }} plan -lock-timeout=300s -concise -detailed-exitcode -out /tmp/tf.plan | tee /tmp/plan-raw.txt
+        ${{ inputs.tf-binary }} plan -lock-timeout=300s ${{ contains(inputs.tf-binary, 'tofu') && '-concise ' || ''}}-detailed-exitcode -out /tmp/tf.plan | tee /tmp/plan-raw.txt
         PLAN_EXIT_CODE=${PIPESTATUS[0]}
         set -o pipefail
         # Exit code 1 means execution error, so fail the step
