@@ -49,6 +49,7 @@ runs:
 
         # Remove ansi colors
         </tmp/plan-raw.txt sed -e 's/\x1b\[[0-9;]*m//g' \
+          | grep -v -E "Refreshing state|will perform the following actions" \
           | grep -v -E "used the selected providers to generate the following execution|Resource actions are indicated with the following symbols" \
           | grep -v -E "Acquiring state lock|Reading|Still reading|Read complete after" \
           | grep -v -E "has compared your real infrastructure against your configuration and|found no differences, so no changes are needed|Releasing state lock" \
