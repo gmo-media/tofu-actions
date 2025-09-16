@@ -25,7 +25,9 @@ interface TerraformConfigInspect {
 
 const inspectDir = (dir: string): TerraformConfigInspect => {
   const bin = core.getInput('terraform-config-inspect', { required: true })
-  const res = spawnSync(bin, ['--json', dir])
+  // Handle root directory - pass '.' instead of empty string
+  const targetDir = dir === '' ? '.' : dir
+  const res = spawnSync(bin, ['--json', targetDir])
   if (res.error) {
     throw res.error
   }
