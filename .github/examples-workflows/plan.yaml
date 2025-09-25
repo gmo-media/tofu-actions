@@ -20,7 +20,6 @@ permissions:
 
 jobs:
   plan:
-    uses: gmo-media/tofu-actions/.github/workflows/quickstart-plan.yaml@v4
+    uses: gmo-media/tofu-actions/.github/workflows/quickstart-plan.yaml@v5
     with:
-      aws-role: arn:aws:iam::0123456789:role/my-plan-role-name
       dir: ${{ inputs.dir }}

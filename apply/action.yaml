@@ -1,10 +1,9 @@
 name: Apply
 
 inputs:
-  tf-binary:
-    description: Terraform or OpenTofu binary name
-    default: tofu
-
+  config:
+    description: tofu-actions config file
+    default: .github/tofu-actions-config.js
   dir:
     description: Directory to run in
     required: true
@@ -15,6 +14,12 @@ inputs:
 runs:
   using: composite
   steps:
+    - id: config
+      uses: gmo-media/tofu-actions/read-config@v5
+      with:
+        config: ${{ inputs.config }}
+        dir: ${{ inputs.dir }}
+
     - name: Sanitize artifact name
       id: artifact-name
       shell: bash
@@ -33,4 +38,4 @@ runs:
     - name: Apply
       working-directory: ${{ inputs.dir }}
       shell: bash
-      run: ${{ inputs.tf-binary }} apply -lock-timeout=300s /tmp/tf.plan
+      run: ${{ steps.config.outputs.tf-binary }} apply -lock-timeout=300s /tmp/tf.plan

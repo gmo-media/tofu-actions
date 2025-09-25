@@ -3,50 +3,6 @@ name: CI
 
 on:
   workflow_call:
-    inputs:
-      tf-binary:
-        description: Terraform or OpenTofu binary name
-        type: string
-        default: tofu
-      terraform-version:
-        description: Terraform version to use (if tf-binary is terraform)
-        type: string
-        default: latest
-
-      auth-mode:
-        description: >-
-          Authentication mode.
-          Activate multiple modes by separating them with spaces.
-          Possible values: aws-oidc (default), aws-cred (deprecated), gcp-oidc
-        type: string
-        default: aws-oidc
-      aws-region:
-        description: AWS region (required when auth-mode contains aws-oidc)
-        type: string
-        default: ap-northeast-1
-      aws-plan-role:
-        description: >-
-          AWS role to assume for planning (required when auth-mode contains aws-oidc)
-          e.g. arn:aws:iam::0123456789:role/my-plan-role-name
-        type: string
-      aws-apply-role:
-        description: >-
-          AWS role to assume for applying (required when auth-mode contains aws-oidc)
-          e.g. arn:aws:iam::0123456789:role/my-apply-role-name
-        type: string
-      gcp-project:
-        description: GCP project ID (required when auth-mode contains gcp-oidc)
-        type: string
-      gcp-idp:
-        description: >-
-          GCP workload identity provider (required when auth-mode contains gcp-oidc)
-          e.g. projects/0123456789/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
-        type: string
-
-    secrets:
-      aws-cred:
-        description: AWS credentials (required when auth-mode contains aws-cred)
-        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -59,29 +15,12 @@ permissions:
   id-token: write
 
 jobs:
-  format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
-      - if: ${{ contains(inputs.tf-binary, 'terraform') }}
-        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
-        with:
-          terraform_version: ${{ inputs.terraform-version }}
-          terraform_wrapper: false
-      - if: ${{ contains(inputs.tf-binary, 'tofu') }}
-        uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
-        with:
-          tofu_version_file: .opentofu-version
-          tofu_wrapper: 'false'
-
-      - run: ${{ inputs.tf-binary }} fmt -recursive -check
-
   prepare:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
       - id: prepare
-        uses: gmo-media/tofu-actions/prepare@v4
+        uses: gmo-media/tofu-actions/prepare@v5
     outputs:
       strategy: ${{ steps.prepare.outputs.strategy }}
       merged-pr-number: ${{ steps.prepare.outputs.merged-pr-number }}
@@ -97,21 +36,12 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/configure@v4
+      - uses: gmo-media/tofu-actions/configure@v5
         with:
-          tf-binary: ${{ inputs.tf-binary }}
-          terraform-version: ${{ inputs.terraform-version }}
           dir: ${{ matrix.dir }}
-          auth-mode: ${{ inputs.auth-mode }}
-          aws-region: ${{ inputs.aws-region }}
-          aws-role: ${{ inputs.aws-plan-role }}
-          aws-cred: ${{ secrets.aws-cred }}
-          gcp-project: ${{ inputs.gcp-project }}
-          gcp-idp: ${{ inputs.gcp-idp }}
 
-      - uses: gmo-media/tofu-actions/plan@v4
+      - uses: gmo-media/tofu-actions/plan@v5
         with:
-          tf-binary: ${{ inputs.tf-binary }}
           dir: ${{ matrix.dir }}
 
   plan-comment:
@@ -120,7 +50,7 @@ jobs:
     name: Plan comment
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/plan-comment@v4
+      - uses: gmo-media/tofu-actions/plan-comment@v5
         with:
           force-fail: ${{ contains(needs.*.result, 'failure') }} # Make this job fail if dependencies failed
 
@@ -138,20 +68,11 @@ jobs:
         name: Fail if no plan found
         run: echo "We wanted to auto-apply a plan generated in PR, but we could not find one. Perhaps the PR workflow failed?" && exit 1
 
-      - uses: gmo-media/tofu-actions/configure@v4
+      - uses: gmo-media/tofu-actions/configure@v5
         with:
-          tf-binary: ${{ inputs.tf-binary }}
-          terraform-version: ${{ inputs.terraform-version }}
           dir: ${{ matrix.dir }}
-          auth-mode: ${{ inputs.auth-mode }}
-          aws-region: ${{ inputs.aws-region }}
-          aws-role: ${{ inputs.aws-apply-role }}
-          aws-cred: ${{ secrets.aws-cred }}
-          gcp-project: ${{ inputs.gcp-project }}
-          gcp-idp: ${{ inputs.gcp-idp }}
 
-      - uses: gmo-media/tofu-actions/apply@v4
+      - uses: gmo-media/tofu-actions/apply@v5
         with:
-          tf-binary: ${{ inputs.tf-binary }}
           dir: ${{ matrix.dir }}
           run-id: ${{ needs.prepare.outputs.merged-pr-run-id }}

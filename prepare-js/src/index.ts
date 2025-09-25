@@ -5,7 +5,7 @@ import path from "node:path";
 import { getLatestRunId, getAssociatedMergedPr, getSelfWorkflowId } from "./run-id.js";
 
 interface Config {
-  dirs: string[];
+  dirs: {};
 }
 
 const readConfig = async (): Promise<Config> => {
@@ -73,7 +73,7 @@ const calculateRunDirs = (config: Config): string[] => {
   const directoryHasChangedFile = (directory: string): boolean =>
     changedFiles.some(file => isDirectoryFile(directory, file))
 
-  return config.dirs
+  return Object.keys(config.dirs)
     .filter(dir => [
       dir,
       ...getModuleSources(dir)
@@ -87,7 +87,7 @@ const run = async () => {
   if (forceAllChanged) {
     console.log(`[prepare] force-all-changed flag is on. Short-circuiting and outputting all paths as 'changed'...`)
   }
-  const runDirs = forceAllChanged ? config.dirs : calculateRunDirs(config)
+  const runDirs = forceAllChanged ? Object.keys(config.dirs) : calculateRunDirs(config)
 
   console.log(`[prepare] Running on directories: ${runDirs}`)
   const strategy = runDirs.map(dir => ({ dir }))

@@ -62,7 +62,7 @@ runs:
 
     - name: Calculate directories to run
       id: prepare
-      uses: gmo-media/tofu-actions/prepare-js@v4
+      uses: gmo-media/tofu-actions/prepare-js@v5
       with:
         github-token: ${{ inputs.github-token }}
         config: ${{ inputs.config }}
