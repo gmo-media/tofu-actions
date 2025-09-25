@@ -1,10 +1,9 @@
 name: Plan
 
 inputs:
-  tf-binary:
-    description: Terraform or OpenTofu binary name
-    default: tofu
-
+  config:
+    description: tofu-actions config file
+    default: .github/tofu-actions-config.js
   dir:
     description: Directory to run in
     required: true
@@ -23,6 +22,12 @@ outputs:
 runs:
   using: composite
   steps:
+    - id: config
+      uses: gmo-media/tofu-actions/read-config@v5
+      with:
+        config: ${{ inputs.config }}
+        dir: ${{ inputs.dir }}
+
     - name: Sanitize artifact name
       id: artifact-name
       shell: bash
@@ -39,7 +44,7 @@ runs:
         set -o pipefail
 
         set +o pipefail
-        ${{ inputs.tf-binary }} plan -lock-timeout=300s ${{ contains(inputs.tf-binary, 'tofu') && '-concise ' || ''}}-detailed-exitcode -out /tmp/tf.plan | tee /tmp/plan-raw.txt
+        ${{ steps.config.outputs.tf-binary }} plan -lock-timeout=300s ${{ contains(steps.config.outputs.tf-binary, 'tofu') && '-concise ' || ''}}-detailed-exitcode -out /tmp/tf.plan | tee /tmp/plan-raw.txt
         PLAN_EXIT_CODE=${PIPESTATUS[0]}
         set -o pipefail
         # Exit code 1 means execution error, so fail the step

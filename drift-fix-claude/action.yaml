@@ -1,10 +1,9 @@
 name: Fix Drift with Claude
 
 inputs:
-  tf-binary:
-    description: Terraform or OpenTofu binary name
-    default: tofu
-
+  config:
+    description: tofu-actions config file
+    default: .github/tofu-actions-config.js
   dir:
     description: Directory that has drift to fix
     required: true
@@ -34,6 +33,12 @@ outputs:
 runs:
   using: composite
   steps:
+    - id: config
+      uses: gmo-media/tofu-actions/read-config@v5
+      with:
+        config: ${{ inputs.config }}
+        dir: ${{ inputs.dir }}
+
     # Create a new branch for the fix
     - name: Create fix branch
       id: branch
@@ -62,7 +67,7 @@ runs:
         echo "$PROMPT" | \
           claude -p --verbose --output-format stream-json \
           --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write" \
-          --disallowedTools "Bash(${{ inputs.tf-binary }}  apply),Bash(git commit),Bash(git push)"
+          --disallowedTools "Bash(${{ steps.config.outputs.tf-binary }}  apply),Bash(git commit),Bash(git push)"
       env:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
@@ -72,8 +77,8 @@ runs:
           Your goal is to update the .tf files to match the current real-world infrastructure state.
 
           ## Important Rules
-          - NEVER run `${{ inputs.tf-binary }} apply` even if there is a need to update tfstate. Preserve the existing infrastructure state.
-          - Only make changes to .tf files and run `${{ inputs.tf-binary }}  plan`.
+          - NEVER run `${{ steps.config.outputs.tf-binary }} apply` even if there is a need to update tfstate. Preserve the existing infrastructure state.
+          - Only make changes to .tf files and run `${{ steps.config.outputs.tf-binary }}  plan`.
           - Always choose the least destructive approach. Be surgical and precise with your edits.
           
           ## Context
@@ -101,7 +106,7 @@ runs:
           This means: incorporate the external changes into your .tf files.
           
           3. Validate
-          After making changes, run: `${{ inputs.tf-binary }}  plan` within directory `${{ inputs.dir }}`.
+          After making changes, run: `${{ steps.config.outputs.tf-binary }}  plan` within directory `${{ inputs.dir }}`.
           The plan MUST show "No changes. Your infrastructure matches the configuration."
           If there are still differences, continue fixing until plan shows no changes.
 
@@ -161,7 +166,7 @@ runs:
         ### What this PR does
         - Updates the .tf configuration files to match the current real infrastructure state
         - Makes minimal, non-destructive changes
-        - Ensures \`${{ inputs.tf-binary }}  plan\` shows \"No changes\" after the fix
+        - Ensures \`${{ steps.config.outputs.tf-binary }}  plan\` shows \"No changes\" after the fix
 
         ### Review checklist
         - [ ] Review the changes to ensure they correctly reflect the infrastructure state

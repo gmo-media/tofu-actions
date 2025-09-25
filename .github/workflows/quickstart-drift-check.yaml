@@ -3,46 +3,7 @@ name: Drift Check
 
 on:
   workflow_call:
-    inputs:
-      tf-binary:
-        description: Terraform or OpenTofu binary name
-        type: string
-        default: tofu
-      terraform-version:
-        description: Terraform version to use (if tf-binary is terraform)
-        type: string
-        default: latest
-
-      auth-mode:
-        description: >-
-          Authentication mode.
-          Activate multiple modes by separating them with spaces.
-          Possible values: aws-oidc (default), aws-cred (deprecated), gcp-oidc
-        type: string
-        default: aws-oidc
-      aws-region:
-        description: AWS region (required when auth-mode contains aws-oidc)
-        type: string
-        default: ap-northeast-1
-      aws-role:
-        description: >-
-          AWS role to assume (required when auth-mode contains aws-oidc)
-          e.g. arn:aws:iam::0123456789:role/my-plan-role-name
-        type: string
-      gcp-project:
-        description: GCP project ID (required when auth-mode contains gcp-oidc)
-        type: string
-      gcp-idp:
-        description: >-
-          GCP workload identity provider (required when auth-mode contains gcp-oidc)
-          e.g. projects/0123456789/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
-        type: string
-
     secrets:
-      aws-cred:
-        description: AWS credentials (required when auth-mode contains aws-cred)
-        required: false
-
       drift-notify-webhook:
         description: Slack webhook URL for drift notification (if omitted, the step fails on detecting drift)
         required: false
@@ -69,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
       - id: prepare
-        uses: gmo-media/tofu-actions/prepare@v4
+        uses: gmo-media/tofu-actions/prepare@v5
         with:
           force-all-changed: 'true'
     outputs:
@@ -83,22 +44,13 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/configure@v4
+      - uses: gmo-media/tofu-actions/configure@v5
         with:
-          tf-binary: ${{ inputs.tf-binary }}
-          terraform-version: ${{ inputs.terraform-version }}
           dir: ${{ matrix.dir }}
-          auth-mode: ${{ inputs.auth-mode }}
-          aws-region: ${{ inputs.aws-region }}
-          aws-role: ${{ inputs.aws-role }}
-          aws-cred: ${{ secrets.aws-cred }}
-          gcp-project: ${{ inputs.gcp-project }}
-          gcp-idp: ${{ inputs.gcp-idp }}
 
       - id: plan
-        uses: gmo-media/tofu-actions/plan@v4
+        uses: gmo-media/tofu-actions/plan@v5
         with:
-          tf-binary: ${{ inputs.tf-binary }}
           dir: ${{ matrix.dir }}
 
       # NOTE: "if" condition cannot reference "secrets" directly, so use shell steps as a workaround
@@ -120,7 +72,7 @@ jobs:
           fi
 
       - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'true' }}
-        uses: gmo-media/tofu-actions/notify-drift@v4
+        uses: gmo-media/tofu-actions/notify-drift@v5
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
@@ -128,9 +80,8 @@ jobs:
           webhook: ${{ secrets.drift-notify-webhook }}
 
       - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-auto-fix.outputs.do-auto-fix == 'true' }}
-        uses: gmo-media/tofu-actions/drift-fix-claude@v4
+        uses: gmo-media/tofu-actions/drift-fix-claude@v5
         with:
-          tf-binary: ${{ inputs.tf-binary }}
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
           github-token: ${{ secrets.github-token }}

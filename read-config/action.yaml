@@ -1,0 +1,31 @@
+name: tofu-actions read-config
+description: Reads tofu-actions config and outputs configuration for the given directory.
+
+inputs:
+  config:
+    description: Tofu actions config file
+    required: true
+  dir:
+    description: Directory to run in
+    required: true
+
+outputs:
+  tf-binary:
+    description: Terraform binary name
+
+  auth-mode:
+    description: Auth mode
+  auth-aws-region:
+    description: AWS region
+  auth-aws-plan-role:
+    description: AWS plan role
+  auth-aws-apply-role:
+    description: AWS apply role
+  auth-gcp-project:
+    description: GCP project ID
+  auth-gcp-identity-provider:
+    description: GCP identity provider
+
+runs:
+  using: node24
+  main: dist/index.js

@@ -17,36 +17,41 @@ See also: [infra-template](https://github.com/gmo-media/infra-template)
 
 ## Getting Started
 
-### Setting up your configuration
+### Setup configuration file
 
-Create a file called `.github/tofu-actions-config.js` in your repository and list your OpenTofu directories.
-You must *not* put `./` at the start or `/` at the end.
+Create a file called `.github/tofu-actions-config.js` in your repository.
+Look at this repository's [.github/tofu-actions-config.js](./.github/tofu-actions-config.js) for syntax.
 
+Configuration example where `./dev/` and `./prod/foo/bar/` contains Terraform codes:
 ```js
+const config = {
+  auth: {
+    mode: 'aws-oidc',
+    awsRegion: 'ap-northeast-1',
+    awsPlanRole: '<role arn>',
+    awsApplyRole: '<role arn>',
+  }
+}
 export default {
-  dirs: [
-    '', // root directory
-    'dev',
-    'prod',
-    'foo/bar',
-  ]
+  dirs: {
+    'dev': config,
+    'prod/foo/bar': config,
+  }
 }
 ```
 
-### Adding workflow files (Quick start)
+### Add workflow files (Quick start)
 
-Copy the workflow examples from `.github/example-workflows/` to your repository's `.github/workflows` directory.
+Copy the workflow files from `.github/example-workflows/` to your repository's `.github/workflows` directory.
+If needed, update the `dir` options in workflow_dispatch.
 
-- Create an `.opentofu-version` file in your repository root
-- Update the `dir` options in workflow_dispatch to match your needs
+> [!NOTE]
+> The `.github/workflows/quickstart-*.yaml` files are ready-to-use, opinionated workflows that you can call from other workflows.
+> They help you get started quickly without writing much code.
+>
+> If you need something more custom, copy the workflow content and adjust it to your needs.
 
-### Understanding the quick start workflows
-
-The `.github/workflows/quickstart-*.yaml` files are ready-to-use opinionated workflows that you can call from other workflows.
-They help you get started quickly without writing much code.
-If you need something more custom, copy the workflow content and adjust it to your needs.
-
-### Recommended Branch Ruleset
+### Import branch ruleset
 
 We recommend importing [recommended-ruleset.json](.github/recommended-ruleset.json) to your repository (Settings -> Rules -> Rulesets -> Import a ruleset).
 
@@ -55,5 +60,6 @@ The most important rules here are:
 - Require status checks to pass before merging (`ci / Plan comment`)
     - Require branches to be up to date before merging
 
-Since applying requires a plan with the *latest* tfstate,
-we recommend this ruleset to ensure that the plan on PR is always up to date.
+To apply with a plan, you need a plan generated with the *latest* tfstate.
+We recommend this ruleset to ensure that the plan on PR is always up to date,
+because the quickstart-ci workflow will use the latest plan from the PR.

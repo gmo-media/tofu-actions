@@ -1,63 +1,42 @@
 name: Configure Terraform/OpenTofu
 
 inputs:
-  tf-binary:
-    description: Terraform or OpenTofu binary name
-    default: tofu
-  terraform-version:
-    description: Terraform version to use (if tf-binary is terraform)
-    default: latest
-
+  config:
+    description: tofu-actions config file
+    default: .github/tofu-actions-config.js
   dir:
     description: Directory to run in
     required: true
 
-  auth-mode:
-    description: >-
-      Authentication mode.
-      Activate multiple modes by separating them with spaces.
-      Possible values: aws-oidc (default), aws-cred (deprecated), gcp-oidc
-    default: aws-oidc
-
-  aws-region:
-    description: AWS region (required when auth-mode contains aws-oidc)
-    default: ap-northeast-1
-  aws-role:
-    description: >-
-      AWS role to assume (required when auth-mode contains aws-oidc)
-      e.g. arn:aws:iam::0123456789:role/my-plan-role-name
-
-  aws-cred:
-    description: AWS credentials (required when auth-mode contains aws-cred)
-
-  gcp-project:
-    description: GCP project ID (required when auth-mode contains gcp-oidc)
-  gcp-idp:
-    description: >-
-      GCP workload identity provider (required when auth-mode contains gcp-oidc)
-      e.g. projects/0123456789/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
+  mode:
+    description: |
+      Mode to run in (plan or apply).
+      Changes AWS role to assume.
+    default: plan
 
 runs:
   using: composite
   steps:
-    # Checkout is required before google-github-actions/auth
+    # NOTE: Checkout is required before google-github-actions/auth
     - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
-
-    - if: ${{ contains(inputs.auth-mode, 'aws-cred') }}
-      uses: gmo-media/tofu-actions/setup-aws-credentials@v4
+    - id: config
+      uses: gmo-media/tofu-actions/read-config@v5
       with:
-        aws_credentials: ${{ inputs.aws-cred }}
-    - if: ${{ contains(inputs.auth-mode, 'aws-oidc') }}
+        config: ${{ inputs.config }}
+        dir: ${{ inputs.dir }}
+
+    - if: ${{ contains(steps.config.outputs.auth-mode, 'aws-oidc') }}
       uses: aws-actions/configure-aws-credentials@a03048d87541d1d9fcf2ecf528a4a65ba9bd7838 # v5
       with:
-        aws-region: ${{ inputs.aws-region }}
-        role-to-assume: ${{ inputs.aws-role }}
-    - if: ${{ contains(inputs.auth-mode, 'gcp-oidc') }}
+        aws-region: ${{ steps.config.outputs.auth-aws-region }}
+        role-to-assume: ${{ inputs.mode == 'apply' && steps.config.outputs.auth-aws-apply-role || steps.config.outputs.auth-aws-plan-role }}
+
+    - if: ${{ contains(steps.config.outputs.auth-mode, 'gcp-oidc') }}
       uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
       with:
-        project_id: ${{ inputs.gcp-project }}
-        workload_identity_provider: ${{ inputs.gcp-idp }}
-    - if: ${{ contains(inputs.auth-mode, 'gcp-oidc') }}
+        project_id: ${{ steps.config.outputs.auth-gcp-project }}
+        workload_identity_provider: ${{ steps.config.outputs.auth-gcp-identity-provider }}
+    - if: ${{ contains(steps.config.outputs.auth-mode, 'gcp-oidc') }}
       name: Ignore generated credentials from google-github-actions/auth
       shell: bash
       run: |
@@ -73,12 +52,11 @@ runs:
           cp .github/aws-config ~/.aws/config
         fi
 
-    - if: ${{ contains(inputs.tf-binary, 'terraform') }}
+    - if: ${{ steps.config.outputs.tf-binary == 'terraform' }}
       uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
       with:
-        terraform_version: ${{ inputs.terraform-version }}
         terraform_wrapper: false
-    - if: ${{ contains(inputs.tf-binary, 'tofu') }}
+    - if: ${{ steps.config.outputs.tf-binary == 'tofu' }}
       uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b # v1.0.6
       with:
         tofu_version_file: .opentofu-version
@@ -86,8 +64,12 @@ runs:
 
     - working-directory: ${{ inputs.dir }}
       shell: bash
-      run: ${{ inputs.tf-binary }} init
+      run: ${{ steps.config.outputs.tf-binary }} fmt -check .
 
     - working-directory: ${{ inputs.dir }}
       shell: bash
-      run: ${{ inputs.tf-binary }} validate
+      run: ${{ steps.config.outputs.tf-binary }} init
+
+    - working-directory: ${{ inputs.dir }}
+      shell: bash
+      run: ${{ steps.config.outputs.tf-binary }} validate
