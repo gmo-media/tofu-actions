@@ -26,6 +26,7 @@ jobs:
       - uses: gmo-media/tofu-actions/configure@v5
         with:
           dir: ${{ inputs.dir }}
+          mode: apply
 
       - uses: gmo-media/tofu-actions/apply@v5
         with:
