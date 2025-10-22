@@ -32,12 +32,12 @@ jobs:
       - id: prepare
         uses: gmo-media/tofu-actions/prepare@v5
         with:
-          force-all-changed: 'true'
+          force-all-changed: "true"
     outputs:
       strategy: ${{ steps.prepare.outputs.strategy }}
 
   drift-check:
-    needs: [ prepare ]
+    needs: [prepare]
     strategy:
       fail-fast: false
       matrix:
@@ -94,3 +94,37 @@ jobs:
         run: |
           echo "Drift detected in ${{ matrix.dir }}."
           exit 1
+
+      # If this workflow itself is failing for some reason (e.g. plan failure), AND if webhook is configured, notify the user
+      - if: ${{ failure() && !cancelled() && steps.check-webhook.outputs.do-notify == 'true' }}
+        name: Send Slack notification
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2
+        with:
+          webhook: ${{ secrets.drift-notify-webhook }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "⚠️ Drift detection failed in ${{ matrix.dir }} environment"
+            blocks:
+              - type: "header"
+                text:
+                  type: "plain_text"
+                  text: "⚠️ Drift Detection Failed"
+                  emoji: true
+              - type: "section"
+                fields:
+                  - type: "mrkdwn"
+                    text: "*Repository:*\n<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}>"
+                  - type: "mrkdwn"
+                    text: "*Workflow Run:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "Drift detection has failed. Please review the workflow logs to see if manual action is needed."
+              - type: "actions"
+                elements:
+                  - type: "button"
+                    text:
+                      type: "plain_text"
+                      text: "View Workflow Log"
+                      emoji: true
+                    url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
