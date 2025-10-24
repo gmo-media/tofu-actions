@@ -13,6 +13,10 @@ on:
         description: Lock ID (see error message of OpenTofu)
         type: string
         required: true
+      tf-binary:
+        description: Terraform binary to use
+        type: string
+        required: true
 
 permissions:
   contents: read
