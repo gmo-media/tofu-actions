@@ -13,10 +13,6 @@ on:
         description: Lock ID (see error message of OpenTofu)
         type: string
         required: true
-      tf-binary:
-        description: Terraform binary to use
-        type: string
-        required: true
 
 permissions:
   contents: read
@@ -27,8 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: gmo-media/tofu-actions/configure@v5
+        id: configure
         with:
           dir: ${{ inputs.dir }}
 
       - working-directory: ${{ inputs.dir }}
-        run: ${{ inputs.tf-binary }} force-unlock -force ${{ inputs.lock-id }}
+        run: ${{ steps.configure.outputs.tf-binary }} force-unlock -force ${{ inputs.lock-id }}
