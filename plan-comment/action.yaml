@@ -155,7 +155,7 @@ runs:
           echo '```' >> /tmp/comment.txt
           cat $file >> /tmp/comment.txt
           echo '```' >> /tmp/comment.txt
-        done < <(find /tmp -name 'plan-*.txt' -print0)
+        done < <(find /tmp -maxdepth 1 -name 'plan-*.txt' -print0)
 
         if [ "$found" = false ]; then
           echo 'No plan output found. If plans are failing, check their logs.' >> /tmp/comment.txt
