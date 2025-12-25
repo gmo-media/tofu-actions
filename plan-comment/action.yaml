@@ -1,4 +1,5 @@
 name: Plan comment
+description: Add plan comment to PR with import guard functionality
 
 inputs:
   apply_workflow_id:
@@ -9,6 +10,10 @@ inputs:
       If true, this step will fail.
       Useful for combining with GitHub branch ruleset enforcing status checks, since "skipped" job counts as success.
     default: 'false'
+  enable-import-guard:
+    description: >-
+      If true, block merge when import is mixed with other changes (add/change/destroy/replace/forget).
+    default: 'true'
 
 runs:
   using: composite
@@ -20,11 +25,112 @@ runs:
         path: /tmp/
         merge-multiple: true
 
+    - id: download-plan-counts
+      name: Download plan counts
+      uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+      continue-on-error: true
+      with:
+        pattern: plan-counts-*
+        path: /tmp/
+        merge-multiple: true
+
+    - id: aggregate-counts
+      name: Aggregate plan counts
+      shell: bash
+      env:
+        DOWNLOAD_OUTCOME: ${{ steps.download-plan-counts.outcome }}
+      run: |
+        # Fail if artifact download failed
+        if [ "$DOWNLOAD_OUTCOME" = "failure" ]; then
+          echo "::error::Failed to download plan-counts artifacts. Import guard cannot verify the plan."
+          echo "download-failed=true" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        # Aggregate counts from all plan jobs
+        TOTAL_IMPORT=0
+        TOTAL_ADD=0
+        TOTAL_CHANGE=0
+        TOTAL_DESTROY=0
+        TOTAL_REPLACE=0
+        TOTAL_FORGET=0
+        FILES_FOUND=0
+
+        if ls /tmp/plan-counts-*.json >/dev/null 2>&1; then
+          FILES_FOUND=$(ls /tmp/plan-counts-*.json 2>/dev/null | wc -l)
+          for file in /tmp/plan-counts-*.json; do
+            TOTAL_IMPORT=$((TOTAL_IMPORT + $(jq -r '.import // 0' "$file")))
+            TOTAL_ADD=$((TOTAL_ADD + $(jq -r '.add // 0' "$file")))
+            TOTAL_CHANGE=$((TOTAL_CHANGE + $(jq -r '.change // 0' "$file")))
+            TOTAL_DESTROY=$((TOTAL_DESTROY + $(jq -r '.destroy // 0' "$file")))
+            TOTAL_REPLACE=$((TOTAL_REPLACE + $(jq -r '.replace // 0' "$file")))
+            TOTAL_FORGET=$((TOTAL_FORGET + $(jq -r '.forget // 0' "$file")))
+          done
+        fi
+
+        # Warn if no plan count files found but download succeeded
+        if [ "$DOWNLOAD_OUTCOME" = "success" ] && [ "$FILES_FOUND" -eq 0 ]; then
+          echo "::warning::No plan-counts files found. Import guard will be skipped."
+        fi
+
+        echo "files-found=$FILES_FOUND" >> $GITHUB_OUTPUT
+        echo "import=$TOTAL_IMPORT" >> $GITHUB_OUTPUT
+        echo "add=$TOTAL_ADD" >> $GITHUB_OUTPUT
+        echo "change=$TOTAL_CHANGE" >> $GITHUB_OUTPUT
+        echo "destroy=$TOTAL_DESTROY" >> $GITHUB_OUTPUT
+        echo "replace=$TOTAL_REPLACE" >> $GITHUB_OUTPUT
+        echo "forget=$TOTAL_FORGET" >> $GITHUB_OUTPUT
+
+        # Check if import is mixed with other changes
+        OTHER_CHANGES=$((TOTAL_ADD + TOTAL_CHANGE + TOTAL_DESTROY + TOTAL_REPLACE + TOTAL_FORGET))
+        if [ "$TOTAL_IMPORT" -gt 0 ] && [ "$OTHER_CHANGES" -gt 0 ]; then
+          echo "import-guard-fail=true" >> $GITHUB_OUTPUT
+        else
+          echo "import-guard-fail=false" >> $GITHUB_OUTPUT
+        fi
+
+        echo "### Aggregated Plan Counts" >> $GITHUB_STEP_SUMMARY
+        echo "| Action | Count |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Import | $TOTAL_IMPORT |" >> $GITHUB_STEP_SUMMARY
+        echo "| Add | $TOTAL_ADD |" >> $GITHUB_STEP_SUMMARY
+        echo "| Change | $TOTAL_CHANGE |" >> $GITHUB_STEP_SUMMARY
+        echo "| Destroy | $TOTAL_DESTROY |" >> $GITHUB_STEP_SUMMARY
+        echo "| Replace | $TOTAL_REPLACE |" >> $GITHUB_STEP_SUMMARY
+        echo "| Forget | $TOTAL_FORGET |" >> $GITHUB_STEP_SUMMARY
+
     - id: composite
       name: Composite plan texts
       shell: bash
+      env:
+        IMPORT_GUARD_FAIL: ${{ steps.aggregate-counts.outputs.import-guard-fail }}
+        ENABLE_IMPORT_GUARD: ${{ inputs.enable-import-guard }}
+        IMPORT_COUNT: ${{ steps.aggregate-counts.outputs.import }}
+        ADD_COUNT: ${{ steps.aggregate-counts.outputs.add }}
+        CHANGE_COUNT: ${{ steps.aggregate-counts.outputs.change }}
+        DESTROY_COUNT: ${{ steps.aggregate-counts.outputs.destroy }}
+        REPLACE_COUNT: ${{ steps.aggregate-counts.outputs.replace }}
+        FORGET_COUNT: ${{ steps.aggregate-counts.outputs.forget }}
       run: |
         echo "## Plan" > /tmp/comment.txt
+
+        # Add import guard warning if enabled and import is mixed with other changes
+        if [ "$ENABLE_IMPORT_GUARD" = "true" ] && [ "$IMPORT_GUARD_FAIL" = "true" ]; then
+          echo '' >> /tmp/comment.txt
+          echo '> [!CAUTION]' >> /tmp/comment.txt
+          echo '> **Import Guard: Merge Blocked**' >> /tmp/comment.txt
+          echo '>' >> /tmp/comment.txt
+          echo '> This PR contains import operations mixed with other changes.' >> /tmp/comment.txt
+          echo '> Import operations should be in a separate PR.' >> /tmp/comment.txt
+          echo '>' >> /tmp/comment.txt
+          echo "> - Import: $IMPORT_COUNT" >> /tmp/comment.txt
+          echo "> - Add: $ADD_COUNT" >> /tmp/comment.txt
+          echo "> - Change: $CHANGE_COUNT" >> /tmp/comment.txt
+          echo "> - Destroy: $DESTROY_COUNT" >> /tmp/comment.txt
+          echo "> - Replace: $REPLACE_COUNT" >> /tmp/comment.txt
+          echo "> - Forget: $FORGET_COUNT" >> /tmp/comment.txt
+          echo '' >> /tmp/comment.txt
+        fi
 
         if ls -d -- /tmp/plan-*.txt >/dev/null 2>&1; then
           found=true
@@ -87,6 +193,21 @@ runs:
         message-id: plan-${{ github.event.pull_request.number }}
         message-failure: Plan was not successful
         message: ${{ steps.composite.outputs.comment }}
+
+    - if: ${{ inputs.enable-import-guard == 'true' && steps.aggregate-counts.outputs.import-guard-fail == 'true' }}
+      name: Import guard fail
+      shell: bash
+      run: |
+        echo "::error::Import Guard: This PR contains import operations mixed with other changes (add/change/destroy/replace/forget). Import operations should be in a separate PR."
+        echo ""
+        echo "Plan Summary:"
+        echo "  Import: ${{ steps.aggregate-counts.outputs.import }}"
+        echo "  Add: ${{ steps.aggregate-counts.outputs.add }}"
+        echo "  Change: ${{ steps.aggregate-counts.outputs.change }}"
+        echo "  Destroy: ${{ steps.aggregate-counts.outputs.destroy }}"
+        echo "  Replace: ${{ steps.aggregate-counts.outputs.replace }}"
+        echo "  Forget: ${{ steps.aggregate-counts.outputs.forget }}"
+        exit 1
 
     - if: ${{ inputs.force-fail == 'true' }}
       name: Force fail

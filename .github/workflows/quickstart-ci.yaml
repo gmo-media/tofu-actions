@@ -3,6 +3,11 @@ name: CI
 
 on:
   workflow_call:
+    inputs:
+      enable-import-guard:
+        description: 'If true, block merge when import is mixed with other changes'
+        type: boolean
+        default: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -53,6 +58,7 @@ jobs:
       - uses: gmo-media/tofu-actions/plan-comment@v5
         with:
           force-fail: ${{ contains(needs.*.result, 'failure') }} # Make this job fail if dependencies failed
+          enable-import-guard: ${{ inputs.enable-import-guard }}
 
   apply:
     needs: [ prepare ]
