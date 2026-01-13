@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - id: prepare
-        uses: gmo-media/tofu-actions/prepare@atsushi-ambo/ci-guard-import-only
+        uses: gmo-media/tofu-actions/prepare@v5
     outputs:
       strategy: ${{ steps.prepare.outputs.strategy }}
       merged-pr-number: ${{ steps.prepare.outputs.merged-pr-number }}
@@ -41,11 +41,11 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/configure@atsushi-ambo/ci-guard-import-only
+      - uses: gmo-media/tofu-actions/configure@v5
         with:
           dir: ${{ matrix.dir }}
 
-      - uses: gmo-media/tofu-actions/plan@atsushi-ambo/ci-guard-import-only
+      - uses: gmo-media/tofu-actions/plan@v5
         with:
           dir: ${{ matrix.dir }}
 
@@ -55,7 +55,7 @@ jobs:
     name: Plan comment
     runs-on: ubuntu-latest
     steps:
-      - uses: gmo-media/tofu-actions/plan-comment@atsushi-ambo/ci-guard-import-only
+      - uses: gmo-media/tofu-actions/plan-comment@v5
         with:
           force-fail: ${{ contains(needs.*.result, 'failure') }} # Make this job fail if dependencies failed
           enable-import-guard: ${{ inputs.enable-import-guard }}
@@ -74,12 +74,12 @@ jobs:
         name: Fail if no plan found
         run: echo "We wanted to auto-apply a plan generated in PR, but we could not find one. Perhaps the PR workflow failed?" && exit 1
 
-      - uses: gmo-media/tofu-actions/configure@atsushi-ambo/ci-guard-import-only
+      - uses: gmo-media/tofu-actions/configure@v5
         with:
           dir: ${{ matrix.dir }}
           mode: apply
 
-      - uses: gmo-media/tofu-actions/apply@atsushi-ambo/ci-guard-import-only
+      - uses: gmo-media/tofu-actions/apply@v5
         with:
           dir: ${{ matrix.dir }}
           run-id: ${{ needs.prepare.outputs.merged-pr-run-id }}
