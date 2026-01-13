@@ -111,17 +111,21 @@ runs:
         # Get plan in JSON format
         ${{ steps.config.outputs.tf-binary }} show -json /tmp/tf.plan > /tmp/plan.json
 
-        # Parse resource_changes to count each action type
+        # Parse resource_changes to count each action type in a single jq call
         # Actions: create, update, delete, replace (delete+create or create+delete), forget
         # Import is indicated by "importing" property in the change object
-
-        IMPORT_COUNT=$(jq '[.resource_changes[]? | select(.change.importing != null)] | length' /tmp/plan.json)
-        # ADD: actions == ["create"] かつ importing がない（importは除外）
-        ADD_COUNT=$(jq '[.resource_changes[]? | select(.change.actions == ["create"] and .change.importing == null)] | length' /tmp/plan.json)
-        CHANGE_COUNT=$(jq '[.resource_changes[]? | select(.change.actions == ["update"])] | length' /tmp/plan.json)
-        DESTROY_COUNT=$(jq '[.resource_changes[]? | select(.change.actions == ["delete"])] | length' /tmp/plan.json)
-        REPLACE_COUNT=$(jq '[.resource_changes[]? | select((.change.actions == ["delete", "create"]) or (.change.actions == ["create", "delete"]))] | length' /tmp/plan.json)
-        FORGET_COUNT=$(jq '[.resource_changes[]? | select(.change.actions == ["forget"])] | length' /tmp/plan.json)
+        eval "$(jq -r '
+          .resource_changes // [] |
+          {
+            import: [.[] | select(.change.importing != null)] | length,
+            add: [.[] | select(.change.actions == ["create"] and .change.importing == null)] | length,
+            change: [.[] | select(.change.actions == ["update"])] | length,
+            destroy: [.[] | select(.change.actions == ["delete"])] | length,
+            replace: [.[] | select((.change.actions == ["delete", "create"]) or (.change.actions == ["create", "delete"]))] | length,
+            forget: [.[] | select(.change.actions == ["forget"])] | length
+          } |
+          "IMPORT_COUNT=\(.import)\nADD_COUNT=\(.add)\nCHANGE_COUNT=\(.change)\nDESTROY_COUNT=\(.destroy)\nREPLACE_COUNT=\(.replace)\nFORGET_COUNT=\(.forget)"
+        ' /tmp/plan.json)"
 
         echo "import=$IMPORT_COUNT" >> $GITHUB_OUTPUT
         echo "add=$ADD_COUNT" >> $GITHUB_OUTPUT
@@ -141,17 +145,9 @@ runs:
         echo "| Forget | $FORGET_COUNT |" >> $GITHUB_STEP_SUMMARY
 
         # Save counts to file for aggregation in plan-comment
-        cat <<EOF > /tmp/plan-counts-${{ steps.artifact-name.outputs.name }}.json
-        {
-          "dir": "${{ inputs.dir }}",
-          "import": $IMPORT_COUNT,
-          "add": $ADD_COUNT,
-          "change": $CHANGE_COUNT,
-          "destroy": $DESTROY_COUNT,
-          "replace": $REPLACE_COUNT,
-          "forget": $FORGET_COUNT
-        }
-        EOF
+        cat > /tmp/plan-counts-${{ steps.artifact-name.outputs.name }}.json <<PLAN_COUNTS_EOF
+        {"dir": "${{ inputs.dir }}", "import": $IMPORT_COUNT, "add": $ADD_COUNT, "change": $CHANGE_COUNT, "destroy": $DESTROY_COUNT, "replace": $REPLACE_COUNT, "forget": $FORGET_COUNT}
+        PLAN_COUNTS_EOF
 
     - name: Upload plan counts
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

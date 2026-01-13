@@ -47,7 +47,7 @@ runs:
           exit 1
         fi
 
-        # Aggregate counts from all plan jobs
+        # Aggregate counts from all plan jobs using a single jq call
         TOTAL_IMPORT=0
         TOTAL_ADD=0
         TOTAL_CHANGE=0
@@ -58,14 +58,20 @@ runs:
 
         if ls /tmp/plan-counts-*.json >/dev/null 2>&1; then
           FILES_FOUND=$(ls /tmp/plan-counts-*.json 2>/dev/null | wc -l)
-          for file in /tmp/plan-counts-*.json; do
-            TOTAL_IMPORT=$((TOTAL_IMPORT + $(jq -r '.import // 0' "$file")))
-            TOTAL_ADD=$((TOTAL_ADD + $(jq -r '.add // 0' "$file")))
-            TOTAL_CHANGE=$((TOTAL_CHANGE + $(jq -r '.change // 0' "$file")))
-            TOTAL_DESTROY=$((TOTAL_DESTROY + $(jq -r '.destroy // 0' "$file")))
-            TOTAL_REPLACE=$((TOTAL_REPLACE + $(jq -r '.replace // 0' "$file")))
-            TOTAL_FORGET=$((TOTAL_FORGET + $(jq -r '.forget // 0' "$file")))
-          done
+          # Use jq -s (slurp) to read all files and aggregate in one call
+          eval "$(jq -s -r '
+            reduce .[] as $item ({import:0, add:0, change:0, destroy:0, replace:0, forget:0};
+              {
+                import: (.import + ($item.import // 0)),
+                add: (.add + ($item.add // 0)),
+                change: (.change + ($item.change // 0)),
+                destroy: (.destroy + ($item.destroy // 0)),
+                replace: (.replace + ($item.replace // 0)),
+                forget: (.forget + ($item.forget // 0))
+              }
+            ) |
+            "TOTAL_IMPORT=\(.import)\nTOTAL_ADD=\(.add)\nTOTAL_CHANGE=\(.change)\nTOTAL_DESTROY=\(.destroy)\nTOTAL_REPLACE=\(.replace)\nTOTAL_FORGET=\(.forget)"
+          ' /tmp/plan-counts-*.json)"
         fi
 
         # Warn if no plan count files found but download succeeded
