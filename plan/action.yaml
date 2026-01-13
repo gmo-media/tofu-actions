@@ -145,9 +145,7 @@ runs:
         echo "| Forget | $FORGET_COUNT |" >> $GITHUB_STEP_SUMMARY
 
         # Save counts to file for aggregation in plan-comment
-        cat > /tmp/plan-counts-${{ steps.artifact-name.outputs.name }}.json <<PLAN_COUNTS_EOF
-        {"dir": "${{ inputs.dir }}", "import": $IMPORT_COUNT, "add": $ADD_COUNT, "change": $CHANGE_COUNT, "destroy": $DESTROY_COUNT, "replace": $REPLACE_COUNT, "forget": $FORGET_COUNT}
-        PLAN_COUNTS_EOF
+        echo "{\"dir\": \"${{ inputs.dir }}\", \"import\": $IMPORT_COUNT, \"add\": $ADD_COUNT, \"change\": $CHANGE_COUNT, \"destroy\": $DESTROY_COUNT, \"replace\": $REPLACE_COUNT, \"forget\": $FORGET_COUNT}" > /tmp/plan-counts-${{ steps.artifact-name.outputs.name }}.json
 
     - name: Upload plan counts
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
