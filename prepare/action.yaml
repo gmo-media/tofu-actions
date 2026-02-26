@@ -51,7 +51,7 @@ runs:
         path: /tmp/terraform-config-inspect
         key: terraform-config-inspect-v0.1.0
     - if: ${{ steps.cache-terraform-config-inspect.outputs.cache-hit != 'true' }}
-      uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+      uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
     - if: ${{ steps.cache-terraform-config-inspect.outputs.cache-hit != 'true' }}
       name: Install terraform-config-inspect
       shell: bash
