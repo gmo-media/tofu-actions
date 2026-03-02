@@ -1,4 +1,5 @@
 name: Plan
+description: Run tofu/terraform plan and parse results
 
 inputs:
   config:
@@ -18,6 +19,24 @@ outputs:
   has-diff:
     description: Plan has diff
     value: ${{ steps.plan.outputs.has-diff }}
+  import-count:
+    description: Number of resources to import
+    value: ${{ steps.parse-plan.outputs.import }}
+  add-count:
+    description: Number of resources to add
+    value: ${{ steps.parse-plan.outputs.add }}
+  change-count:
+    description: Number of resources to change
+    value: ${{ steps.parse-plan.outputs.change }}
+  destroy-count:
+    description: Number of resources to destroy
+    value: ${{ steps.parse-plan.outputs.destroy }}
+  replace-count:
+    description: Number of resources to replace
+    value: ${{ steps.parse-plan.outputs.replace }}
+  forget-count:
+    description: Number of resources to forget
+    value: ${{ steps.parse-plan.outputs.forget }}
 
 runs:
   using: composite
@@ -83,6 +102,56 @@ runs:
           echo "Unexpected exit code: $PLAN_EXIT_CODE"
           exit 1
         fi
+
+    - id: parse-plan
+      name: Parse plan JSON
+      working-directory: ${{ inputs.dir }}
+      shell: bash
+      run: |
+        # Get plan in JSON format
+        ${{ steps.config.outputs.tf-binary }} show -json /tmp/tf.plan > /tmp/plan.json
+
+        # Parse resource_changes to count each action type in a single jq call
+        # Actions: create, update, delete, replace (delete+create or create+delete), forget
+        # Import is indicated by "importing" property in the change object
+        eval "$(jq -r '
+          .resource_changes // [] |
+          {
+            import: [.[] | select(.change.importing != null)] | length,
+            add: [.[] | select(.change.actions == ["create"] and .change.importing == null)] | length,
+            change: [.[] | select(.change.actions == ["update"])] | length,
+            destroy: [.[] | select(.change.actions == ["delete"])] | length,
+            replace: [.[] | select((.change.actions == ["delete", "create"]) or (.change.actions == ["create", "delete"]))] | length,
+            forget: [.[] | select(.change.actions == ["forget"])] | length
+          } |
+          "IMPORT_COUNT=\(.import)\nADD_COUNT=\(.add)\nCHANGE_COUNT=\(.change)\nDESTROY_COUNT=\(.destroy)\nREPLACE_COUNT=\(.replace)\nFORGET_COUNT=\(.forget)"
+        ' /tmp/plan.json)"
+
+        echo "import=$IMPORT_COUNT" >> $GITHUB_OUTPUT
+        echo "add=$ADD_COUNT" >> $GITHUB_OUTPUT
+        echo "change=$CHANGE_COUNT" >> $GITHUB_OUTPUT
+        echo "destroy=$DESTROY_COUNT" >> $GITHUB_OUTPUT
+        echo "replace=$REPLACE_COUNT" >> $GITHUB_OUTPUT
+        echo "forget=$FORGET_COUNT" >> $GITHUB_OUTPUT
+
+        echo "### Plan Summary (${{ inputs.dir }})" >> $GITHUB_STEP_SUMMARY
+        echo "| Action | Count |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Import | $IMPORT_COUNT |" >> $GITHUB_STEP_SUMMARY
+        echo "| Add | $ADD_COUNT |" >> $GITHUB_STEP_SUMMARY
+        echo "| Change | $CHANGE_COUNT |" >> $GITHUB_STEP_SUMMARY
+        echo "| Destroy | $DESTROY_COUNT |" >> $GITHUB_STEP_SUMMARY
+        echo "| Replace | $REPLACE_COUNT |" >> $GITHUB_STEP_SUMMARY
+        echo "| Forget | $FORGET_COUNT |" >> $GITHUB_STEP_SUMMARY
+
+        # Save counts to file for aggregation in plan-comment
+        echo "{\"dir\": \"${{ inputs.dir }}\", \"import\": $IMPORT_COUNT, \"add\": $ADD_COUNT, \"change\": $CHANGE_COUNT, \"destroy\": $DESTROY_COUNT, \"replace\": $REPLACE_COUNT, \"forget\": $FORGET_COUNT}" > /tmp/plan-counts-${{ steps.artifact-name.outputs.name }}.json
+
+    - name: Upload plan counts
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: plan-counts-${{ steps.artifact-name.outputs.name }}
+        path: /tmp/plan-counts-${{ steps.artifact-name.outputs.name }}.json
 
     - name: Upload plan text
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
