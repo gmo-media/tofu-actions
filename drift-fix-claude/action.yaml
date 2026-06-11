@@ -15,9 +15,22 @@ inputs:
   github-token:
     description: GitHub token (GitHub App or PAT is required to trigger workflows)
   anthropic-api-key:
-    description: Anthropic API key
+    description: Anthropic API key (not needed when use-vertex is true)
   claude-code-oauth-token:
     description: Claude Code OAuth token (alternative to anthropic_api_key)
+  use-vertex:
+    description: >-
+      Use Google Vertex AI instead of the Anthropic API. Requires GCP
+      credentials set up beforehand (e.g. google-github-actions/auth with
+      workload identity) and vertex-project-id.
+    default: 'false'
+  vertex-project-id:
+    description: GCP project ID for Vertex AI (required when use-vertex is true)
+  vertex-region:
+    description: Vertex AI region (CLOUD_ML_REGION) used when use-vertex is true
+    default: global
+  model:
+    description: "Model to use (e.g. claude-opus-4-7). Empty uses the Claude Code default."
 
   base-branch:
     description: Base branch for the PR
@@ -103,34 +116,32 @@ runs:
         PLAN: ${{ inputs.plan }}
       run: echo "$PLAN" > /tmp/plan.txt
 
-    - name: Setup Claude Code
-      if: ${{ steps.guard.outputs.skip != 'true' }}
-      shell: bash
-      run: |
-        curl -fsSL https://claude.ai/install.sh | bash -s latest
-        export PATH="~/.local/bin:$PATH"
-
     # Use Claude Code to fix the drift. The prompt lives in
     # .claude/skills/fix-drift/SKILL.md at the repository root (the parent of
-    # $GITHUB_ACTION_PATH); --add-dir makes Claude Code auto-load skills from
+    # the action path); --add-dir makes Claude Code auto-load skills from
     # that directory's .claude/skills.
     # COUPLING (keep in sync): the /fix-drift argument order must match the
     # `arguments:` declaration in that SKILL.md (checked by
     # tests/fix-drift-skill.test.sh).
+    # Pin >= v1.0.144: older releases (e.g. v1.0.37) pin a Claude Code CLI
+    # that predates skill auto-loading from --add-dir directories (2.1.32).
     - name: Fix drift with Claude Code
       if: ${{ steps.guard.outputs.skip != 'true' }}
-      shell: bash
+      uses: anthropics/claude-code-action@15b5879e769f1b8e7f7fddda7358a557995e9841 # v1.0.144
       env:
-        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
-        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
-        DIR: ${{ inputs.dir }}
-        TF_BINARY: ${{ steps.config.outputs.tf-binary }}
-      run: |
-        claude -p "/fix-drift $DIR $TF_BINARY /tmp/plan.txt" \
-          --add-dir "$(dirname "$GITHUB_ACTION_PATH")" \
-          --verbose --output-format stream-json \
-          --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write" \
-          --disallowedTools "Bash($TF_BINARY apply),Bash(git commit),Bash(git push)"
+        ANTHROPIC_VERTEX_PROJECT_ID: ${{ inputs.vertex-project-id }}
+        CLOUD_ML_REGION: ${{ inputs.vertex-region }}
+        ANTHROPIC_MODEL: ${{ inputs.model }}
+      with:
+        use_vertex: ${{ inputs.use-vertex }}
+        anthropic_api_key: ${{ inputs.anthropic-api-key }}
+        claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
+        github_token: ${{ inputs.github-token || github.token }}
+        prompt: /fix-drift ${{ inputs.dir }} ${{ steps.config.outputs.tf-binary }} /tmp/plan.txt
+        claude_args: >-
+          --add-dir "${{ github.action_path }}/.."
+          --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write"
+          --disallowedTools "Bash(${{ steps.config.outputs.tf-binary }} apply),Bash(git commit),Bash(git push)"
 
     # No-change gate: deterministically verify Claude's fix by re-running
     # plan and requiring "No changes". The verdict mapping lives in

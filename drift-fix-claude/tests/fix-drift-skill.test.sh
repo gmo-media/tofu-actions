@@ -47,18 +47,20 @@ grep -q '^disable-model-invocation: true' "$SKILL"
 check "SKILL.md disables model auto-invocation" $?
 
 # --- Action side: the /fix-drift call must pass the same number of arguments --
-INVOCATION=$(grep -o '"/fix-drift[^"]*"' "$ACTION" | head -1)
+INVOCATION=$(grep -m1 -o 'prompt: /fix-drift.*' "$ACTION")
 [ -n "$INVOCATION" ]
-check "action.yaml invokes /fix-drift" $? "no /fix-drift invocation found"
+check "action.yaml invokes /fix-drift via the prompt input" $? "no /fix-drift invocation found"
 
 DECLARED_COUNT=$(echo "$ARGS_LINE" | wc -w | tr -d ' ')
-# Subtract 1 for the leading "/fix-drift" token itself
-PASSED_COUNT=$(( $(echo "$INVOCATION" | tr -d '"' | wc -w | tr -d ' ') - 1 ))
+# Collapse each ${{ ... }} expression into a single token, then subtract 2
+# for the leading "prompt:" and "/fix-drift" tokens themselves
+NORMALIZED=$(echo "$INVOCATION" | sed -E 's/\$\{\{[^}]*\}\}/EXPR/g')
+PASSED_COUNT=$(( $(echo "$NORMALIZED" | wc -w | tr -d ' ') - 2 ))
 [ "$DECLARED_COUNT" -eq "$PASSED_COUNT" ]
 check "argument count matches (declared=$DECLARED_COUNT, passed=$PASSED_COUNT)" $?
 
 # --add-dir must point claude at the action repo root, or the skill is never loaded
-grep -qF -- '--add-dir "$(dirname "$GITHUB_ACTION_PATH")"' "$ACTION"
+grep -qF -- '--add-dir "${{ github.action_path }}/.."' "$ACTION"
 check "action.yaml loads skills via --add-dir from the action repo root" $?
 
 echo "---"
