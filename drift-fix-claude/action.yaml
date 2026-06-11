@@ -25,16 +25,56 @@ inputs:
 
 outputs:
   pr-url:
-    description: URL of the created pull request
+    description: URL of the created pull request (empty when skipped)
     value: ${{ steps.create-pr.outputs.pr-url }}
   branch-name:
-    description: Name of the branch with fixes
+    description: Name of the branch with fixes (empty when skipped)
     value: ${{ steps.branch.outputs.name }}
+  skipped:
+    description: "true if an open drift-fix PR already existed and the fix was skipped"
+    value: ${{ steps.guard.outputs.skip }}
+  existing-pr-number:
+    description: Number of the existing open drift-fix PR when skipped (otherwise empty)
+    value: ${{ steps.guard.outputs.existing-pr-number }}
 
 runs:
   using: composite
   steps:
+    # Skip everything below (including the costly Claude run) when an open
+    # drift-fix PR for this dir already exists, so repeated cron runs do not
+    # pile up duplicate PRs for the same unresolved drift.
+    # The match logic lives in scripts/match-existing-pr.jq (shared with the
+    # unit test in tests/match-existing-pr.test.sh).
+    - name: Skip if an open drift-fix PR already exists
+      id: guard
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
+        DIR: ${{ inputs.dir }}
+        BASE_BRANCH: ${{ inputs.base-branch }}
+      run: |
+        # --limit 200: default is 30; raise it so drift-fix PRs are not buried.
+        PRS=$(gh pr list \
+          --state open \
+          --base "$BASE_BRANCH" \
+          --limit 200 \
+          --json number,headRefName)
+
+        EXISTING_PR=$(printf '%s' "$PRS" \
+          | jq -r --arg dir "$DIR" -f "$GITHUB_ACTION_PATH/scripts/match-existing-pr.jq")
+
+        if [ -n "$EXISTING_PR" ]; then
+          {
+            echo "skip=true"
+            echo "existing-pr-number=$EXISTING_PR"
+          } >> "$GITHUB_OUTPUT"
+          echo "Skipped drift fix for \`$DIR\`: open PR #$EXISTING_PR already exists." >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - id: config
+      if: ${{ steps.guard.outputs.skip != 'true' }}
       uses: gmo-media/tofu-actions/read-config@v5
       with:
         config: ${{ inputs.config }}
@@ -42,20 +82,26 @@ runs:
 
     # Create a new branch for the fix
     - name: Create fix branch
+      if: ${{ steps.guard.outputs.skip != 'true' }}
       id: branch
       shell: bash
       run: |
+        # COUPLING (keep in sync): this branch name is matched by the guard via
+        # scripts/match-existing-pr.jq. Changing the format here requires
+        # updating that filter (and its tests) accordingly.
         BRANCH_NAME="fix-drift-$(echo '${{ inputs.dir }}' | tr '/' '-')-$(date +%Y%m%d-%H%M%S)"
         git checkout -b "$BRANCH_NAME"
         echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
     - name: Save plan to file
+      if: ${{ steps.guard.outputs.skip != 'true' }}
       shell: bash
       env:
         PLAN: ${{ inputs.plan }}
       run: echo "$PLAN" > /tmp/plan.txt
 
     - name: Setup Claude Code
+      if: ${{ steps.guard.outputs.skip != 'true' }}
       shell: bash
       run: |
         curl -fsSL https://claude.ai/install.sh | bash -s latest
@@ -63,6 +109,7 @@ runs:
 
     # Use Claude Code to fix the drift
     - name: Fix drift with Claude Code
+      if: ${{ steps.guard.outputs.skip != 'true' }}
       shell: bash
       run: |
         echo "$PROMPT" | \
@@ -113,6 +160,7 @@ runs:
 
     # Commit the changes (whether successful or not, for debugging)
     - name: Commit changes
+      if: ${{ steps.guard.outputs.skip != 'true' }}
       shell: bash
       run: |
         git config user.name "github-actions[bot]"
@@ -140,6 +188,7 @@ runs:
 
     # Create a pull request if changes were made
     - name: Create Pull Request
+      if: ${{ steps.guard.outputs.skip != 'true' }}
       id: create-pr
       shell: bash
       env:
