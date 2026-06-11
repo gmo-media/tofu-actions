@@ -110,56 +110,26 @@ runs:
         curl -fsSL https://claude.ai/install.sh | bash -s latest
         export PATH="~/.local/bin:$PATH"
 
-    # Use Claude Code to fix the drift
+    # Use Claude Code to fix the drift. The prompt lives in
+    # .claude/skills/fix-drift/SKILL.md next to this action; --add-dir makes
+    # Claude Code auto-load skills from $GITHUB_ACTION_PATH/.claude/skills.
+    # COUPLING (keep in sync): the /fix-drift argument order must match the
+    # `arguments:` declaration in that SKILL.md (checked by
+    # tests/fix-drift-skill.test.sh).
     - name: Fix drift with Claude Code
       if: ${{ steps.guard.outputs.skip != 'true' }}
       shell: bash
-      run: |
-        echo "$PROMPT" | \
-          claude -p --verbose --output-format stream-json \
-          --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write" \
-          --disallowedTools "Bash(${{ steps.config.outputs.tf-binary }}  apply),Bash(git commit),Bash(git push)"
       env:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
-        PROMPT: |
-          # CRITICAL INSTRUCTIONS FOR FIXING INFRASTRUCTURE DRIFT
-          You have been given a critical task to fix infrastructure drift in Terraform/OpenTofu configuration files.
-          Your goal is to update the .tf files to match the current real-world infrastructure state.
-
-          ## Important Rules
-          - NEVER run `${{ steps.config.outputs.tf-binary }} apply` even if there is a need to update tfstate. Preserve the existing infrastructure state.
-          - Only make changes to .tf files and run `${{ steps.config.outputs.tf-binary }}  plan`.
-          - Always choose the least destructive approach. Be surgical and precise with your edits.
-          
-          ## Context
-          - Directory with drift: ${{ inputs.dir }}
-          - The plan result is in /tmp/plan.txt
-          
-          ## YOUR MISSION - FOLLOW THESE STEPS EXACTLY:
-          1. Read the plan and understand the changes
-          The plan is trying to *revert* the external changes done to the infrastructure.
-          For example, if the plan shows:
-          ```
-          ~ resource "aws_instance" "example" {
-              ~ instance_type = "t3.micro" -> "t2.micro"
-          }
-          ```
-          "t3.micro" is the real infrastructure state, while "t2.micro" is what's in our .tf files.
-          This means a user may have manually changed the instance type from t2.micro to t3.micro, and didn't update the .tf file.
-          You should update the .tf file to match reality - "t3.micro".
-          
-          The plan is usually quite verbose with default values.
-          Try not to be confused by these verbose lines - try to extract only the important changes.
-          
-          2. Fix the drift
-          Update .tf files to match the CURRENT REAL INFRASTRUCTURE STATE.
-          This means: incorporate the external changes into your .tf files.
-          
-          3. Validate
-          After making changes, run: `${{ steps.config.outputs.tf-binary }}  plan` within directory `${{ inputs.dir }}`.
-          The plan MUST show "No changes. Your infrastructure matches the configuration."
-          If there are still differences, continue fixing until plan shows no changes.
+        DIR: ${{ inputs.dir }}
+        TF_BINARY: ${{ steps.config.outputs.tf-binary }}
+      run: |
+        claude -p "/fix-drift $DIR $TF_BINARY /tmp/plan.txt" \
+          --add-dir "$GITHUB_ACTION_PATH" \
+          --verbose --output-format stream-json \
+          --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write" \
+          --disallowedTools "Bash($TF_BINARY apply),Bash(git commit),Bash(git push)"
 
     # No-change gate: deterministically verify Claude's fix by re-running
     # plan and requiring "No changes". The verdict mapping lives in

@@ -71,3 +71,5 @@ jobs:
         run: bash drift-fix-claude/tests/match-existing-pr.test.sh
       - name: Run drift-fix no-change gate tests
         run: bash drift-fix-claude/tests/no-change-gate.test.sh
+      - name: Run drift-fix skill packaging tests
+        run: bash drift-fix-claude/tests/fix-drift-skill.test.sh
