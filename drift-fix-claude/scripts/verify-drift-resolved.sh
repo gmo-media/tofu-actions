@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # No-change gate: deterministically verify Claude's fix by re-running plan
-# and requiring "No changes". The verdict mapping lives in no-change-gate.sh
-# (shared with tests/no-change-gate.test.sh).
+# and requiring "No changes". A remaining plan that would destroy and
+# recreate (-/+ or +/-) a resource is never handed off, even as a draft PR.
+# The verdict mapping lives in no-change-gate.sh (shared with
+# tests/no-change-gate.test.sh).
 #
 # Env:    DIR, TF_BINARY
 # Writes: verdict / fix-verified to GITHUB_OUTPUT, summary to
@@ -34,7 +36,16 @@ set +e
 PLAN_EXIT_CODE=$?
 set -e
 
-VERDICT=$("$SCRIPT_DIR/no-change-gate.sh" "$PLAN_EXIT_CODE" "$HAS_DIFF")
+# Replacement detection: "# <addr> must be replaced" header comments and
+# -/+ / +/- resource action lines. Create-only or destroy-only changes do
+# not match; only a destroy-and-recreate of the same resource does.
+if grep -qE '^[[:space:]]*(# .* must be replaced$|[-+]/[-+] resource )' /tmp/verify-plan.txt; then
+  HAS_REPLACE=true
+else
+  HAS_REPLACE=false
+fi
+
+VERDICT=$("$SCRIPT_DIR/no-change-gate.sh" "$PLAN_EXIT_CODE" "$HAS_DIFF" "$HAS_REPLACE")
 {
   echo "verdict=$VERDICT"
   if [ "$VERDICT" = "pr" ]; then
@@ -62,6 +73,19 @@ case "$VERDICT" in
       # markdown.
       sed 's/^/    /' /tmp/verify-plan.txt
     } >> "$GITHUB_STEP_SUMMARY"
+    ;;
+  replace-fail)
+    {
+      echo "Verification failed: the plan after the fix in \`$DIR\` would destroy and recreate (-/+) resources; refusing to hand off a PR."
+      echo
+      # Indented code block: unlike a ``` fence, plan output that
+      # itself contains backticks cannot break out and render as
+      # markdown.
+      sed 's/^/    /' /tmp/verify-plan.txt
+    } >> "$GITHUB_STEP_SUMMARY"
+    echo "Plan would replace resources in \`$DIR\`; refusing to create a PR."
+    cat /tmp/verify-plan.txt
+    exit 1
     ;;
   *)
     if [ "$PLAN_EXIT_CODE" = "2" ]; then
