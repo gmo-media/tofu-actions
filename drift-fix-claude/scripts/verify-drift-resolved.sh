@@ -5,8 +5,8 @@
 #
 # Env:    DIR, TF_BINARY
 # Writes: verdict / fix-verified to GITHUB_OUTPUT, summary to
-#         GITHUB_STEP_SUMMARY, cleaned plan output to /tmp/verify-plan.txt
-#         (reused by create-pr.sh for the draft PR body)
+#         GITHUB_STEP_SUMMARY, plan output (stdout+stderr) to
+#         /tmp/verify-plan.txt (reused by create-pr.sh for the draft PR body)
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,12 +27,12 @@ case "$TF_BINARY" in
 esac
 
 set +e
-(cd "$DIR" && "$TF_BINARY" plan -lock-timeout=300s $CONCISE_FLAG -detailed-exitcode) > /tmp/verify-plan-raw.txt
+# -no-color: the output is embedded in the PR body / job summary.
+# 2>&1: plan errors go to stderr; capture them so the fail branch and
+# the draft PR body are not empty on exit code 1.
+(cd "$DIR" && "$TF_BINARY" plan -no-color -lock-timeout=300s $CONCISE_FLAG -detailed-exitcode) > /tmp/verify-plan.txt 2>&1
 PLAN_EXIT_CODE=$?
 set -e
-
-# Remove ansi colors (the cleaned output is reused in the PR body)
-sed -e 's/\x1b\[[0-9;]*m//g' /tmp/verify-plan-raw.txt > /tmp/verify-plan.txt
 
 VERDICT=$("$SCRIPT_DIR/no-change-gate.sh" "$PLAN_EXIT_CODE" "$HAS_DIFF")
 {
