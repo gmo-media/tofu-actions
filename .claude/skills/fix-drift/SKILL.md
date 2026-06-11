@@ -13,6 +13,7 @@ Your goal is to update the .tf files to match the current real-world infrastruct
 - NEVER run `$tf_binary apply` even if there is a need to update tfstate. Preserve the existing infrastructure state.
 - Only make changes to .tf files and run `$tf_binary plan`.
 - Always choose the least destructive approach. Be surgical and precise with your edits.
+- NEVER leave the configuration in a state where `$tf_binary plan` would destroy and then recreate a resource (the `-/+` / `+/-` actions, shown as "must be replaced" / "forces replacement"). If one of your edits causes a replacement, revert or rework that edit until no replacement remains (e.g. use a `moved` block instead of renaming a resource). A leftover change that only creates or only destroys a resource is tolerable; a paired destroy-and-create of the same resource is not — the verification gate fails the whole run if one remains.
 
 ## Context
 - Directory with drift: $dir
