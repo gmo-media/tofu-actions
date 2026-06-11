@@ -1,4 +1,5 @@
 name: Configure Terraform/OpenTofu
+description: Authenticates to cloud providers and sets up Terraform/OpenTofu, then runs fmt, init, and validate.
 
 inputs:
   config:

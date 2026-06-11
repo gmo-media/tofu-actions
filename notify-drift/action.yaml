@@ -1,4 +1,5 @@
 name: Notify drift
+description: Sends a Slack notification when infrastructure drift is detected.
 
 inputs:
   dir:

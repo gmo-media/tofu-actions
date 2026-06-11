@@ -1,4 +1,5 @@
 name: Plan
+description: Runs Terraform/OpenTofu plan and uploads the plan output and plan file as artifacts.
 
 inputs:
   config:
