@@ -30,7 +30,7 @@ inputs:
     description: Vertex AI region (CLOUD_ML_REGION) used when use-vertex is true
     default: global
   model:
-    description: "Model to use (e.g. claude-opus-4-7). Empty uses the Claude Code default."
+    description: "Model to use (e.g. claude-sonnet-4-6). Empty uses the Claude Code default."
 
   base-branch:
     description: Base branch for the PR
@@ -57,10 +57,7 @@ runs:
   using: composite
   steps:
     # Skip everything below (including the costly Claude run) when an open
-    # drift-fix PR for this dir already exists, so repeated cron runs do not
-    # pile up duplicate PRs for the same unresolved drift.
-    # The match logic lives in scripts/match-existing-pr.jq (shared with the
-    # unit test in tests/match-existing-pr.test.sh).
+    # drift-fix PR for this dir already exists. See scripts/guard-existing-pr.sh.
     - name: Skip if an open drift-fix PR already exists
       id: guard
       shell: bash
@@ -68,26 +65,7 @@ runs:
         GH_TOKEN: ${{ inputs.github-token || github.token }}
         DIR: ${{ inputs.dir }}
         BASE_BRANCH: ${{ inputs.base-branch }}
-      run: |
-        # --limit 200: default is 30; raise it so drift-fix PRs are not buried.
-        PRS=$(gh pr list \
-          --state open \
-          --base "$BASE_BRANCH" \
-          --limit 200 \
-          --json number,headRefName)
-
-        EXISTING_PR=$(printf '%s' "$PRS" \
-          | jq -r --arg dir "$DIR" -f "$GITHUB_ACTION_PATH/scripts/match-existing-pr.jq")
-
-        if [ -n "$EXISTING_PR" ]; then
-          {
-            echo "skip=true"
-            echo "existing-pr-number=$EXISTING_PR"
-          } >> "$GITHUB_OUTPUT"
-          echo "Skipped drift fix for \`$DIR\`: open PR #$EXISTING_PR already exists." >> "$GITHUB_STEP_SUMMARY"
-        else
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-        fi
+      run: '"$GITHUB_ACTION_PATH/scripts/guard-existing-pr.sh"'
 
     - id: config
       if: ${{ steps.guard.outputs.skip != 'true' }}
@@ -96,18 +74,14 @@ runs:
         config: ${{ inputs.config }}
         dir: ${{ inputs.dir }}
 
-    # Create a new branch for the fix
+    # Create a new branch for the fix. See scripts/create-fix-branch.sh.
     - name: Create fix branch
       if: ${{ steps.guard.outputs.skip != 'true' }}
       id: branch
       shell: bash
-      run: |
-        # COUPLING (keep in sync): this branch name is matched by the guard via
-        # scripts/match-existing-pr.jq. Changing the format here requires
-        # updating that filter (and its tests) accordingly.
-        BRANCH_NAME="fix-drift-$(echo '${{ inputs.dir }}' | tr '/' '-')-$(date +%Y%m%d-%H%M%S)"
-        git checkout -b "$BRANCH_NAME"
-        echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+      env:
+        DIR: ${{ inputs.dir }}
+      run: '"$GITHUB_ACTION_PATH/scripts/create-fix-branch.sh"'
 
     - name: Save plan to file
       if: ${{ steps.guard.outputs.skip != 'true' }}
@@ -144,8 +118,9 @@ runs:
           --disallowedTools "Bash(${{ steps.config.outputs.tf-binary }} apply),Bash(git commit),Bash(git push)"
 
     # No-change gate: deterministically verify Claude's fix by re-running
-    # plan and requiring "No changes". The verdict mapping lives in
-    # scripts/no-change-gate.sh (shared with tests/no-change-gate.test.sh).
+    # plan and requiring "No changes". See scripts/verify-drift-resolved.sh;
+    # the verdict mapping lives in scripts/no-change-gate.sh (shared with
+    # tests/no-change-gate.test.sh).
     - name: Verify drift is resolved (no-change gate)
       id: verify
       if: ${{ steps.guard.outputs.skip != 'true' }}
@@ -153,98 +128,21 @@ runs:
       env:
         DIR: ${{ inputs.dir }}
         TF_BINARY: ${{ steps.config.outputs.tf-binary }}
-      run: |
-        # git status --porcelain also catches newly created .tf files,
-        # unlike git diff (assumes init artifacts like .terraform/ are
-        # gitignored in the consumer repo, same as the git add -A below).
-        if [ -n "$(git status --porcelain)" ]; then
-          HAS_DIFF=true
-        else
-          HAS_DIFF=false
-        fi
-
-        set +e
-        (cd "$DIR" && "$TF_BINARY" plan -lock-timeout=300s ${{ contains(steps.config.outputs.tf-binary, 'tofu') && '-concise ' || ''}}-detailed-exitcode) > /tmp/verify-plan-raw.txt
-        PLAN_EXIT_CODE=$?
-        set -e
-
-        # Remove ansi colors (the cleaned output is reused in the PR body)
-        sed -e 's/\x1b\[[0-9;]*m//g' /tmp/verify-plan-raw.txt > /tmp/verify-plan.txt
-
-        VERDICT=$("$GITHUB_ACTION_PATH/scripts/no-change-gate.sh" "$PLAN_EXIT_CODE" "$HAS_DIFF")
-        {
-          echo "verdict=$VERDICT"
-          if [ "$VERDICT" = "pr" ]; then
-            echo "fix-verified=true"
-          elif [ "$VERDICT" = "draft-pr" ]; then
-            echo "fix-verified=false"
-          else
-            echo "fix-verified="
-          fi
-        } >> "$GITHUB_OUTPUT"
-
-        case "$VERDICT" in
-          pr)
-            echo "Verified: plan shows no changes after the fix in \`$DIR\`." >> "$GITHUB_STEP_SUMMARY"
-            ;;
-          resolved)
-            echo "Drift in \`$DIR\` is already resolved; skipping PR creation." >> "$GITHUB_STEP_SUMMARY"
-            ;;
-          draft-pr)
-            {
-              echo "Verification failed: plan still shows changes after the fix in \`$DIR\`; creating a draft PR."
-              echo
-              # Indented code block: unlike a ``` fence, plan output that
-              # itself contains backticks cannot break out and render as
-              # markdown.
-              sed 's/^/    /' /tmp/verify-plan.txt
-            } >> "$GITHUB_STEP_SUMMARY"
-            ;;
-          *)
-            if [ "$PLAN_EXIT_CODE" = "2" ]; then
-              echo "Claude made no changes but drift remains in \`$DIR\`." | tee -a "$GITHUB_STEP_SUMMARY"
-            else
-              echo "Verification plan failed in \`$DIR\` (exit code $PLAN_EXIT_CODE)." | tee -a "$GITHUB_STEP_SUMMARY"
-            fi
-            cat /tmp/verify-plan.txt
-            exit 1
-            ;;
-        esac
+      run: '"$GITHUB_ACTION_PATH/scripts/verify-drift-resolved.sh"'
 
     # Commit the changes (also for unverified fixes, so they can be handed
-    # off to a human as a draft PR)
+    # off to a human as a draft PR). See scripts/commit-and-push.sh.
     - name: Commit changes
       if: ${{ steps.guard.outputs.skip != 'true' && (steps.verify.outputs.verdict == 'pr' || steps.verify.outputs.verdict == 'draft-pr') }}
       shell: bash
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-        # git status --porcelain also catches newly created files,
-        # unlike git diff (same detection as the verify step)
-        if [ -z "$(git status --porcelain)" ]; then
-          echo "No changes to commit"
-          exit 0
-        fi
-
-        git add -A
-
-        COMMIT_MSG="fix: Auto-fix infrastructure drift in ${{ inputs.dir }}
-
-        This commit automatically fixes infrastructure drift detected in ${{ inputs.dir }}.
-        The changes update the Terraform/OpenTofu configuration to match the current
-        real-world infrastructure state.
-
-        Automated by Claude Code drift fixer"
-
-        git commit -m "$COMMIT_MSG"
-        git push origin ${{ steps.branch.outputs.name }}
-        echo "Changes committed and pushed to branch ${{ steps.branch.outputs.name }}"
+      env:
+        DIR: ${{ inputs.dir }}
+        BRANCH_NAME: ${{ steps.branch.outputs.name }}
+      run: '"$GITHUB_ACTION_PATH/scripts/commit-and-push.sh"'
 
     # Create a pull request if changes were made. Unverified fixes
-    # (verdict=draft-pr) become a draft PR with a warning so a human can
-    # finish the fix; the idempotency guard still sees the open draft PR
-    # and keeps later cron runs from re-running Claude.
+    # (verdict=draft-pr) become a draft PR so a human can finish the fix.
+    # See scripts/create-pr.sh.
     - name: Create Pull Request
       if: ${{ steps.guard.outputs.skip != 'true' && (steps.verify.outputs.verdict == 'pr' || steps.verify.outputs.verdict == 'draft-pr') }}
       id: create-pr
@@ -256,70 +154,4 @@ runs:
         BASE_BRANCH: ${{ inputs.base-branch }}
         BRANCH_NAME: ${{ steps.branch.outputs.name }}
         VERDICT: ${{ steps.verify.outputs.verdict }}
-      run: |
-        # Check if changes were pushed
-        if ! git rev-parse --verify "origin/$BRANCH_NAME" >/dev/null 2>&1; then
-          echo "No changes were pushed, skipping PR creation"
-          exit 0
-        fi
-
-        BODY_FILE=/tmp/pr-body.md
-        : > "$BODY_FILE"
-        DRAFT_FLAG=()
-
-        if [ "$VERDICT" = "draft-pr" ]; then
-          TITLE="⚠️ Auto-fix infrastructure drift in $DIR (unverified)"
-          DRAFT_FLAG=(--draft)
-          VERIFIED_LINE="- ⚠️ NOT verified: \`$TF_BINARY plan\` still shows changes (see above)"
-          {
-            echo "## ⚠️ Verification failed"
-            echo
-            echo "After the automated fix, \`$TF_BINARY plan\` still shows changes."
-            echo "A human needs to finish this fix before merging."
-            echo "Remaining plan output (truncated to 40000 characters; the full output is in the workflow job summary):"
-            echo
-            # Indented code block: unlike a ``` fence, plan output that
-            # itself contains backticks cannot break out and render as
-            # markdown.
-            head -c 40000 /tmp/verify-plan.txt | sed 's/^/    /'
-            echo
-            echo
-          } >> "$BODY_FILE"
-        else
-          TITLE="🔧 Auto-fix infrastructure drift in $DIR"
-          VERIFIED_LINE="- Verified: \`$TF_BINARY plan\` shows \"No changes\" after the fix"
-        fi
-
-        cat >> "$BODY_FILE" <<EOF
-        ## 🤖 Automated Drift Fix
-
-        This PR is an automatic attempt to fix infrastructure drift in \`$DIR\`.
-
-        ### What happened?
-        Infrastructure drift was detected during the drift check. This means the real-world infrastructure
-        state differs from what's defined in the Terraform/OpenTofu configuration files.
-
-        ### What this PR does
-        - Updates the .tf configuration files to match the current real infrastructure state
-        - Makes minimal, non-destructive changes
-        $VERIFIED_LINE
-
-        ### Review checklist
-        - [ ] Review the changes to ensure they correctly reflect the infrastructure state
-        - [ ] Verify that only drifted values were updated
-        - [ ] Confirm no unnecessary default values were added
-        - [ ] Check that the changes are minimal and non-destructive
-
-        ---
-        *This PR was automatically generated by the drift fix workflow using Claude Code.*
-        EOF
-
-        PR_URL=$(gh pr create \
-            --title "$TITLE" \
-            --base "$BASE_BRANCH" \
-            --head "$BRANCH_NAME" \
-            --body-file "$BODY_FILE" \
-            "${DRAFT_FLAG[@]}")
-
-        echo "Pull request created: $PR_URL"
-        echo "pr-url=$PR_URL" >> $GITHUB_OUTPUT
+      run: '"$GITHUB_ACTION_PATH/scripts/create-pr.sh"'

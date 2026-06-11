@@ -73,3 +73,5 @@ jobs:
         run: bash drift-fix-claude/tests/no-change-gate.test.sh
       - name: Run drift-fix skill packaging tests
         run: bash drift-fix-claude/tests/fix-drift-skill.test.sh
+      - name: Run drift-fix scripts lint
+        run: bash drift-fix-claude/tests/scripts-lint.test.sh
