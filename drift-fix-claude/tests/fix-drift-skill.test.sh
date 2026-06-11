@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Unit tests for the fix-drift skill packaging (.claude/skills/fix-drift/SKILL.md).
-# Guards the COUPLING between the /fix-drift invocation in action.yaml and the
-# skill's `arguments:` declaration. Pure bash, no GitHub access required.
+# Unit tests for the fix-drift skill packaging (repo-root
+# .claude/skills/fix-drift/SKILL.md). Guards the COUPLING between the
+# /fix-drift invocation in action.yaml and the skill's `arguments:`
+# declaration. Pure bash, no GitHub access required.
 # Run: bash drift-fix-claude/tests/fix-drift-skill.test.sh
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL="$SCRIPT_DIR/../.claude/skills/fix-drift/SKILL.md"
+SKILL="$SCRIPT_DIR/../../.claude/skills/fix-drift/SKILL.md"
 ACTION="$SCRIPT_DIR/../action.yaml"
 
 pass=0
@@ -56,9 +57,9 @@ PASSED_COUNT=$(( $(echo "$INVOCATION" | tr -d '"' | wc -w | tr -d ' ') - 1 ))
 [ "$DECLARED_COUNT" -eq "$PASSED_COUNT" ]
 check "argument count matches (declared=$DECLARED_COUNT, passed=$PASSED_COUNT)" $?
 
-# --add-dir must point claude at the action path, or the skill is never loaded
-grep -q -- '--add-dir "\$GITHUB_ACTION_PATH"' "$ACTION"
-check "action.yaml loads skills via --add-dir \$GITHUB_ACTION_PATH" $?
+# --add-dir must point claude at the action repo root, or the skill is never loaded
+grep -qF -- '--add-dir "$(dirname "$GITHUB_ACTION_PATH")"' "$ACTION"
+check "action.yaml loads skills via --add-dir from the action repo root" $?
 
 echo "---"
 echo "passed: $pass, failed: $fail"

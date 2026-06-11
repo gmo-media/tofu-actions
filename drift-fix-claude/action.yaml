@@ -111,8 +111,9 @@ runs:
         export PATH="~/.local/bin:$PATH"
 
     # Use Claude Code to fix the drift. The prompt lives in
-    # .claude/skills/fix-drift/SKILL.md next to this action; --add-dir makes
-    # Claude Code auto-load skills from $GITHUB_ACTION_PATH/.claude/skills.
+    # .claude/skills/fix-drift/SKILL.md at the repository root (the parent of
+    # $GITHUB_ACTION_PATH); --add-dir makes Claude Code auto-load skills from
+    # that directory's .claude/skills.
     # COUPLING (keep in sync): the /fix-drift argument order must match the
     # `arguments:` declaration in that SKILL.md (checked by
     # tests/fix-drift-skill.test.sh).
@@ -126,7 +127,7 @@ runs:
         TF_BINARY: ${{ steps.config.outputs.tf-binary }}
       run: |
         claude -p "/fix-drift $DIR $TF_BINARY /tmp/plan.txt" \
-          --add-dir "$GITHUB_ACTION_PATH" \
+          --add-dir "$(dirname "$GITHUB_ACTION_PATH")" \
           --verbose --output-format stream-json \
           --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write" \
           --disallowedTools "Bash($TF_BINARY apply),Bash(git commit),Bash(git push)"
