@@ -211,9 +211,11 @@ runs:
           draft-pr)
             {
               echo "Verification failed: plan still shows changes after the fix in \`$DIR\`; creating a draft PR."
-              echo '```plaintext'
-              cat /tmp/verify-plan.txt
-              echo '```'
+              echo
+              # Indented code block: unlike a ``` fence, plan output that
+              # itself contains backticks cannot break out and render as
+              # markdown.
+              sed 's/^/    /' /tmp/verify-plan.txt
             } >> "$GITHUB_STEP_SUMMARY"
             ;;
           *)
@@ -294,10 +296,11 @@ runs:
             echo "A human needs to finish this fix before merging."
             echo "Remaining plan output (truncated to 40000 characters; the full output is in the workflow job summary):"
             echo
-            echo '```plaintext'
-            head -c 40000 /tmp/verify-plan.txt
+            # Indented code block: unlike a ``` fence, plan output that
+            # itself contains backticks cannot break out and render as
+            # markdown.
+            head -c 40000 /tmp/verify-plan.txt | sed 's/^/    /'
             echo
-            echo '```'
             echo
           } >> "$BODY_FILE"
         else
