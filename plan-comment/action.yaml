@@ -1,4 +1,5 @@
 name: Plan comment
+description: Composites plan outputs from artifacts and posts them as a pull request comment.
 
 inputs:
   apply_workflow_id:
