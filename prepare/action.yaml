@@ -1,4 +1,5 @@
 name: Prepare
+description: Calculates directories to run based on changed files and builds the strategy matrix.
 
 inputs:
   github-token:

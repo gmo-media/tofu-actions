@@ -1,4 +1,5 @@
 name: Apply
+description: Downloads a previously generated plan artifact and applies it.
 
 inputs:
   config:
