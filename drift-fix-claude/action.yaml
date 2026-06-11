@@ -115,7 +115,7 @@ runs:
         claude_args: >-
           --add-dir "${{ github.action_path }}/.."
           --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write"
-          --disallowedTools "Bash(${{ steps.config.outputs.tf-binary }} apply),Bash(git commit),Bash(git push)"
+          --disallowedTools "Bash(${{ steps.config.outputs.tf-binary }} apply:*),Bash(git commit:*),Bash(git push:*)"
 
     # No-change gate: deterministically verify Claude's fix by re-running
     # plan and requiring "No changes". See scripts/verify-drift-resolved.sh;

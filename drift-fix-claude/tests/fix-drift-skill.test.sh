@@ -63,6 +63,17 @@ check "argument count matches (declared=$DECLARED_COUNT, passed=$PASSED_COUNT)" 
 grep -qF -- '--add-dir "${{ github.action_path }}/.."' "$ACTION"
 check "action.yaml loads skills via --add-dir from the action repo root" $?
 
+# --- Disallowed Bash rules must use :* prefix matching -------------------------
+# Bash(cmd) alone is an exact match: it blocks the bare `cmd` but lets
+# `cmd <args>` through. Every disallowed Bash rule needs the :* suffix.
+DISALLOWED_LINE=$(grep -m1 -o -- '--disallowedTools "[^"]*"' "$ACTION")
+[ -n "$DISALLOWED_LINE" ]
+check "action.yaml declares disallowedTools" $?
+
+BARE_RULES=$(echo "$DISALLOWED_LINE" | grep -o 'Bash([^)]*)' | grep -v ':\*)$')
+[ -z "$BARE_RULES" ]
+check "all disallowed Bash rules use :* prefix matching" $? "exact-match rules found: $BARE_RULES"
+
 echo "---"
 echo "passed: $pass, failed: $fail"
 [ "$fail" -eq 0 ]
