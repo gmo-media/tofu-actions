@@ -36,6 +36,9 @@ outputs:
   existing-pr-number:
     description: Number of the existing open drift-fix PR when skipped (otherwise empty)
     value: ${{ steps.guard.outputs.existing-pr-number }}
+  fix-verified:
+    description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created unverified, empty when no PR was created"
+    value: ${{ steps.verify.outputs.fix-verified }}
 
 runs:
   using: composite
@@ -157,6 +160,72 @@ runs:
           After making changes, run: `${{ steps.config.outputs.tf-binary }}  plan` within directory `${{ inputs.dir }}`.
           The plan MUST show "No changes. Your infrastructure matches the configuration."
           If there are still differences, continue fixing until plan shows no changes.
+
+    # No-change gate: deterministically verify Claude's fix by re-running
+    # plan and requiring "No changes". The verdict mapping lives in
+    # scripts/no-change-gate.sh (shared with tests/no-change-gate.test.sh).
+    - name: Verify drift is resolved (no-change gate)
+      id: verify
+      if: ${{ steps.guard.outputs.skip != 'true' }}
+      shell: bash
+      env:
+        DIR: ${{ inputs.dir }}
+        TF_BINARY: ${{ steps.config.outputs.tf-binary }}
+      run: |
+        # git status --porcelain also catches newly created .tf files,
+        # unlike git diff (assumes init artifacts like .terraform/ are
+        # gitignored in the consumer repo, same as the git add -A below).
+        if [ -n "$(git status --porcelain)" ]; then
+          HAS_DIFF=true
+        else
+          HAS_DIFF=false
+        fi
+
+        set +e
+        (cd "$DIR" && "$TF_BINARY" plan -lock-timeout=300s ${{ contains(steps.config.outputs.tf-binary, 'tofu') && '-concise ' || ''}}-detailed-exitcode) > /tmp/verify-plan-raw.txt
+        PLAN_EXIT_CODE=$?
+        set -e
+
+        # Remove ansi colors (the cleaned output is reused in the PR body)
+        sed -e 's/\x1b\[[0-9;]*m//g' /tmp/verify-plan-raw.txt > /tmp/verify-plan.txt
+
+        VERDICT=$("$GITHUB_ACTION_PATH/scripts/no-change-gate.sh" "$PLAN_EXIT_CODE" "$HAS_DIFF")
+        {
+          echo "verdict=$VERDICT"
+          if [ "$VERDICT" = "pr" ]; then
+            echo "fix-verified=true"
+          elif [ "$VERDICT" = "draft-pr" ]; then
+            echo "fix-verified=false"
+          else
+            echo "fix-verified="
+          fi
+        } >> "$GITHUB_OUTPUT"
+
+        case "$VERDICT" in
+          pr)
+            echo "Verified: plan shows no changes after the fix in \`$DIR\`." >> "$GITHUB_STEP_SUMMARY"
+            ;;
+          resolved)
+            echo "Drift in \`$DIR\` is already resolved; skipping PR creation." >> "$GITHUB_STEP_SUMMARY"
+            ;;
+          draft-pr)
+            {
+              echo "Verification failed: plan still shows changes after the fix in \`$DIR\`; creating a draft PR."
+              echo '```plaintext'
+              cat /tmp/verify-plan.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            ;;
+          *)
+            if [ "$PLAN_EXIT_CODE" = "2" ]; then
+              echo "Claude made no changes but drift remains in \`$DIR\`." | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              echo "Verification plan failed in \`$DIR\` (exit code $PLAN_EXIT_CODE)." | tee -a "$GITHUB_STEP_SUMMARY"
+            fi
+            cat /tmp/verify-plan.txt
+            exit 1
+            ;;
+        esac
 
     # Commit the changes (whether successful or not, for debugging)
     - name: Commit changes
