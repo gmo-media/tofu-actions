@@ -13,6 +13,9 @@
 #         (the output of `gh pr list --state open --json number,headRefName`).
 # Arg   : --arg dir "<inputs.dir>"  (the RAW directory; slashes are sanitized here).
 # Output: the number of the first matching open PR, or nothing at all when none match.
+#         "First" follows the input order (`gh pr list` lists newest first), so on
+#         multiple matches this reports the most recent PR; any one match suffices
+#         to skip, so the exact number chosen does not affect the skip decision.
 #
 # We match by a literal prefix plus a timestamp regex (instead of a single
 # regex over the whole branch name) so that regex metacharacters in the
