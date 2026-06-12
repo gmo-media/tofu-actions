@@ -11,7 +11,9 @@
 # Writes: pr-url to GITHUB_OUTPUT
 set -eo pipefail
 
-# Check if changes were pushed
+# Check if changes were pushed. In update mode the PR branch always exists
+# on origin, so this never triggers there; pushes are guaranteed by the
+# verdict gate (pr / draft-pr implies a working-tree diff was committed).
 if ! git rev-parse --verify "origin/$BRANCH_NAME" >/dev/null 2>&1; then
   echo "No changes were pushed, skipping PR creation"
   exit 0
@@ -87,7 +89,7 @@ if [ "$MODE" = "update" ]; then
   else
     RESULT_LINE="The fix is still unverified: \`$TF_BINARY plan\` shows remaining changes (see the PR description)."
   fi
-  gh pr comment "$EXISTING_PR_NUMBER" --body "🤖 New drift was detected in \`$DIR\` after this PR was created (the infrastructure changed again), so the automated fix was re-run on this branch. $RESULT_LINE"
+  gh pr comment "$EXISTING_PR_NUMBER" --body "🤖 New drift was detected in \`$DIR\` since the last automated fix on this branch (the infrastructure changed again), so the automated fix was re-run. $RESULT_LINE"
 
   PR_URL=$(gh pr view "$EXISTING_PR_NUMBER" --json url -q .url)
   echo "Pull request updated: $PR_URL"
