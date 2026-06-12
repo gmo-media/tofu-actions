@@ -79,3 +79,5 @@ jobs:
         run: bash drift-fix-claude/tests/run-verify-plan.test.sh
       - name: Run drift-fix scripts lint
         run: bash drift-fix-claude/tests/scripts-lint.test.sh
+      - name: Run drift-fix action inputs consistency tests
+        run: bash drift-fix-claude/tests/action-inputs.test.sh

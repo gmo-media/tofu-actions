@@ -3,6 +3,29 @@ name: Drift Check
 
 on:
   workflow_call:
+    inputs:
+      # Setting both workload-identity-provider and service-account enables
+      # automatic drift fix via Claude Code on Vertex AI.
+      workload-identity-provider:
+        description: Workload Identity Provider for Google Cloud authentication (Vertex AI)
+        type: string
+        required: false
+      service-account:
+        description: Service account email for Google Cloud authentication (Vertex AI)
+        type: string
+        required: false
+      anthropic-vertex-project-id:
+        description: Anthropic Vertex AI project ID for automatic drift fix
+        type: string
+        required: false
+      cloud-ml-region:
+        description: Cloud ML region for Vertex AI
+        type: string
+        required: false
+      anthropic-model:
+        description: Anthropic model to use for automatic drift fix
+        type: string
+        required: false
     secrets:
       drift-notify-webhook:
         description: Slack webhook URL for drift notification (if omitted, the step fails on detecting drift)
@@ -10,12 +33,6 @@ on:
 
       github-token:
         description: GitHub token for creating PR in automatic drift fix (optional, required for triggering workflows)
-        required: false
-      anthropic-api-key:
-        description: Anthropic API key for automatic drift fix
-        required: false
-      claude-code-oauth-token:
-        description: Claude code OAuth token for automatic drift fix
         required: false
 
 permissions:
@@ -62,10 +79,12 @@ jobs:
           else
             echo "do-notify=false" >> $GITHUB_OUTPUT
           fi
+      # Auto-fix runs when the Vertex AI (Workload Identity Federation)
+      # inputs are provided; both are required by drift-fix-claude.
       - id: check-auto-fix
         shell: bash
         run: |
-          if [ -n "${{ secrets.anthropic-api-key }}" ] || [ -n "${{ secrets.claude-code-oauth-token }}" ]; then
+          if [ -n "${{ inputs.workload-identity-provider }}" ] && [ -n "${{ inputs.service-account }}" ]; then
             echo "do-auto-fix=true" >> $GITHUB_OUTPUT
           else
             echo "do-auto-fix=false" >> $GITHUB_OUTPUT
@@ -85,8 +104,11 @@ jobs:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
           github-token: ${{ secrets.github-token }}
-          anthropic-api-key: ${{ secrets.claude-api-key }}
-          claude-code-oauth-token: ${{ secrets.claude-code-oauth-token }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          service-account: ${{ inputs.service-account }}
+          anthropic-vertex-project-id: ${{ inputs.anthropic-vertex-project-id }}
+          cloud-ml-region: ${{ inputs.cloud-ml-region }}
+          anthropic-model: ${{ inputs.anthropic-model }}
 
       # Simply fail to notify the user if no webhook is given
       - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'false' }}
