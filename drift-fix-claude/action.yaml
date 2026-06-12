@@ -38,16 +38,16 @@ inputs:
 
 outputs:
   pr-url:
-    description: URL of the created pull request (empty when skipped)
+    description: URL of the created or updated pull request (empty when skipped)
     value: ${{ steps.create-pr.outputs.pr-url }}
   branch-name:
-    description: Name of the branch with fixes (empty when skipped)
+    description: Name of the branch with fixes (the existing PR's branch when it was updated; empty when skipped)
     value: ${{ steps.branch.outputs.name }}
   skipped:
-    description: "true if an open drift-fix PR already existed and the fix was skipped"
+    description: "true if an open drift-fix PR already existed and still resolves the drift (or a human has committed to it), so the fix was skipped"
     value: ${{ steps.guard.outputs.skip }}
   existing-pr-number:
-    description: Number of the existing open drift-fix PR when skipped (otherwise empty)
+    description: Number of the existing open drift-fix PR when skipped or updated (otherwise empty)
     value: ${{ steps.guard.outputs.existing-pr-number }}
   fix-verified:
     description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created unverified, empty when no PR was created"
@@ -56,35 +56,45 @@ outputs:
 runs:
   using: composite
   steps:
-    # Skip everything below (including the costly Claude run) when an open
-    # drift-fix PR for this dir already exists. See scripts/guard-existing-pr.sh.
-    - name: Skip if an open drift-fix PR already exists
+    # read-config runs before the guard because the guard needs tf-binary
+    # to re-run plan on an existing PR's branch for the stale check.
+    - id: config
+      uses: gmo-media/tofu-actions/read-config@v5
+      with:
+        config: ${{ inputs.config }}
+        dir: ${{ inputs.dir }}
+
+    # Decide skip / create / update before the costly Claude run. Skips when
+    # an open drift-fix PR still resolves the drift (or a human committed to
+    # it); hands off mode=update when the PR went stale because new drift
+    # appeared after it was created. See scripts/guard-existing-pr.sh.
+    - name: Check existing drift-fix PR (skip / create / update)
       id: guard
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token || github.token }}
         DIR: ${{ inputs.dir }}
         BASE_BRANCH: ${{ inputs.base-branch }}
+        TF_BINARY: ${{ steps.config.outputs.tf-binary }}
       run: '"$GITHUB_ACTION_PATH/scripts/guard-existing-pr.sh"'
 
-    - id: config
-      if: ${{ steps.guard.outputs.skip != 'true' }}
-      uses: gmo-media/tofu-actions/read-config@v5
-      with:
-        config: ${{ inputs.config }}
-        dir: ${{ inputs.dir }}
-
-    # Create a new branch for the fix. See scripts/create-fix-branch.sh.
+    # Create a new branch for the fix, or reuse the existing PR branch in
+    # update mode. See scripts/create-fix-branch.sh.
     - name: Create fix branch
       if: ${{ steps.guard.outputs.skip != 'true' }}
       id: branch
       shell: bash
       env:
         DIR: ${{ inputs.dir }}
+        MODE: ${{ steps.guard.outputs.mode }}
+        EXISTING_BRANCH: ${{ steps.guard.outputs.branch }}
       run: '"$GITHUB_ACTION_PATH/scripts/create-fix-branch.sh"'
 
+    # In update mode the guard already wrote the PR branch's fresh plan to
+    # /tmp/plan.txt; the `plan` input reflects the base branch and would be
+    # wrong for the re-run.
     - name: Save plan to file
-      if: ${{ steps.guard.outputs.skip != 'true' }}
+      if: ${{ steps.guard.outputs.skip != 'true' && steps.guard.outputs.mode == 'create' }}
       shell: bash
       env:
         PLAN: ${{ inputs.plan }}
@@ -141,10 +151,11 @@ runs:
         BRANCH_NAME: ${{ steps.branch.outputs.name }}
       run: '"$GITHUB_ACTION_PATH/scripts/commit-and-push.sh"'
 
-    # Create a pull request if changes were made. Unverified fixes
-    # (verdict=draft-pr) become a draft PR so a human can finish the fix.
-    # See scripts/create-pr.sh.
-    - name: Create Pull Request
+    # Create a pull request if changes were made, or update the existing one
+    # in update mode (title/body/draft state synced to the verdict plus a
+    # notification comment). Unverified fixes (verdict=draft-pr) become a
+    # draft PR so a human can finish the fix. See scripts/create-pr.sh.
+    - name: Create or update Pull Request
       if: ${{ steps.guard.outputs.skip != 'true' && (steps.verify.outputs.verdict == 'pr' || steps.verify.outputs.verdict == 'draft-pr') }}
       id: create-pr
       shell: bash
@@ -155,4 +166,6 @@ runs:
         BASE_BRANCH: ${{ inputs.base-branch }}
         BRANCH_NAME: ${{ steps.branch.outputs.name }}
         VERDICT: ${{ steps.verify.outputs.verdict }}
+        MODE: ${{ steps.guard.outputs.mode }}
+        EXISTING_PR_NUMBER: ${{ steps.guard.outputs.existing-pr-number }}
       run: '"$GITHUB_ACTION_PATH/scripts/create-pr.sh"'
