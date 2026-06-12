@@ -14,6 +14,12 @@ inputs:
 
   github-token:
     description: GitHub token (GitHub App or PAT is required to trigger workflows)
+  workload-identity-provider:
+    description: Workload Identity Provider for Google Cloud authentication (required for Vertex AI)
+    required: true
+  service-account:
+    description: Service account email for Google Cloud authentication (required for Vertex AI)
+    required: true
   anthropic-vertex-project-id:
     description: Anthropic Vertex AI project ID
   cloud-ml-region:
@@ -50,6 +56,12 @@ runs:
         BRANCH_NAME="fix-drift-$(echo '${{ inputs.dir }}' | tr '/' '-')-$(date +%Y%m%d-%H%M%S)"
         git checkout -b "$BRANCH_NAME"
         echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+      with:
+        workload_identity_provider: ${{ inputs.workload-identity-provider }}
+        service_account: ${{ inputs.service-account }}
 
     - name: Save plan to file
       shell: bash
