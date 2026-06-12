@@ -14,10 +14,15 @@ inputs:
 
   github-token:
     description: GitHub token (GitHub App or PAT is required to trigger workflows)
-  anthropic-api-key:
-    description: Anthropic API key
-  claude-code-oauth-token:
-    description: Claude Code OAuth token (alternative to anthropic_api_key)
+  anthropic-vertex-project-id:
+    description: Anthropic Vertex AI project ID
+    default: gmomediadatadev
+  cloud-ml-region:
+    description: Cloud ML region for Vertex AI
+    default: global
+  anthropic-model:
+    description: Anthropic model to use
+    default: claude-sonnet-4-6
 
   base-branch:
     description: Base branch for the PR
@@ -55,37 +60,33 @@ runs:
         PLAN: ${{ inputs.plan }}
       run: echo "$PLAN" > /tmp/plan.txt
 
-    - name: Setup Claude Code
-      shell: bash
-      run: |
-        curl -fsSL https://claude.ai/install.sh | bash -s latest
-        export PATH="~/.local/bin:$PATH"
-
     # Use Claude Code to fix the drift
     - name: Fix drift with Claude Code
-      shell: bash
-      run: |
-        echo "$PROMPT" | \
-          claude -p --verbose --output-format stream-json \
-          --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write" \
-          --disallowedTools "Bash(${{ steps.config.outputs.tf-binary }}  apply),Bash(git commit),Bash(git push)"
+      uses: anthropics/claude-code-base-action@eee9e25eaeacec8bd408cda169d11f0e2e5c02c6
+      continue-on-error: true
       env:
-        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
-        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
-        PROMPT: |
+        ANTHROPIC_VERTEX_PROJECT_ID: ${{ inputs.anthropic-vertex-project-id }}
+        CLOUD_ML_REGION: ${{ inputs.cloud-ml-region }}
+        ANTHROPIC_MODEL: ${{ inputs.anthropic-model }}
+      with:
+        use_vertex: "true"
+        claude_args: >-
+          --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write"
+          --disallowedTools "Bash(${{ steps.config.outputs.tf-binary }} apply),Bash(git commit),Bash(git push)"
+        prompt: |
           # CRITICAL INSTRUCTIONS FOR FIXING INFRASTRUCTURE DRIFT
           You have been given a critical task to fix infrastructure drift in Terraform/OpenTofu configuration files.
           Your goal is to update the .tf files to match the current real-world infrastructure state.
 
           ## Important Rules
           - NEVER run `${{ steps.config.outputs.tf-binary }} apply` even if there is a need to update tfstate. Preserve the existing infrastructure state.
-          - Only make changes to .tf files and run `${{ steps.config.outputs.tf-binary }}  plan`.
+          - Only make changes to .tf files and run `${{ steps.config.outputs.tf-binary }} plan`.
           - Always choose the least destructive approach. Be surgical and precise with your edits.
-          
+
           ## Context
           - Directory with drift: ${{ inputs.dir }}
           - The plan result is in /tmp/plan.txt
-          
+
           ## YOUR MISSION - FOLLOW THESE STEPS EXACTLY:
           1. Read the plan and understand the changes
           The plan is trying to *revert* the external changes done to the infrastructure.
@@ -98,16 +99,16 @@ runs:
           "t3.micro" is the real infrastructure state, while "t2.micro" is what's in our .tf files.
           This means a user may have manually changed the instance type from t2.micro to t3.micro, and didn't update the .tf file.
           You should update the .tf file to match reality - "t3.micro".
-          
+
           The plan is usually quite verbose with default values.
           Try not to be confused by these verbose lines - try to extract only the important changes.
-          
+
           2. Fix the drift
           Update .tf files to match the CURRENT REAL INFRASTRUCTURE STATE.
           This means: incorporate the external changes into your .tf files.
-          
+
           3. Validate
-          After making changes, run: `${{ steps.config.outputs.tf-binary }}  plan` within directory `${{ inputs.dir }}`.
+          After making changes, run: `${{ steps.config.outputs.tf-binary }} plan` within directory `${{ inputs.dir }}`.
           The plan MUST show "No changes. Your infrastructure matches the configuration."
           If there are still differences, continue fixing until plan shows no changes.
 
