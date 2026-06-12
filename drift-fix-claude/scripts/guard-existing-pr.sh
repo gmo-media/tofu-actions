@@ -95,6 +95,8 @@ case "$PLAN_EXIT_CODE" in
     echo "Open PR #$EXISTING_PR no longer resolves the drift in \`$DIR\` (new drift since it was created); re-running the fix on its branch." >> "$GITHUB_STEP_SUMMARY"
     ;;
   *)
+    # No checkout restore here: this step fails the job, so no later
+    # steps observe the unexpected HEAD.
     echo "Verification plan on PR #$EXISTING_PR branch \`$EXISTING_BRANCH\` failed (exit code $PLAN_EXIT_CODE)." | tee -a "$GITHUB_STEP_SUMMARY"
     cat /tmp/guard-plan.txt
     exit 1
