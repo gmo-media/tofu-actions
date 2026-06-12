@@ -1,7 +1,7 @@
 # Identify whether an open drift-fix PR already exists for a given directory.
 #
 # This is the single source of truth for the idempotency match used by the
-# "Skip if an open drift-fix PR already exists" guard step in ../action.yaml,
+# guard step in ../action.yaml,
 # and it is exercised directly by ../tests/match-existing-pr.test.sh.
 #
 # COUPLING (keep in sync): the branch name produced by the "Create fix branch"

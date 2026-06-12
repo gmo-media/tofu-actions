@@ -50,7 +50,7 @@ outputs:
     description: Number of the existing open drift-fix PR when skipped or updated (otherwise empty)
     value: ${{ steps.guard.outputs.existing-pr-number }}
   fix-verified:
-    description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created unverified, empty when no PR was created"
+    description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created or updated unverified, empty when no PR was created"
     value: ${{ steps.verify.outputs.fix-verified }}
 
 runs:
