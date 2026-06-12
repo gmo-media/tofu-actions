@@ -81,3 +81,5 @@ jobs:
         run: bash drift-fix-claude/tests/scripts-lint.test.sh
       - name: Run drift-fix action inputs consistency tests
         run: bash drift-fix-claude/tests/action-inputs.test.sh
+      - name: Run drift-fix guard config gate tests
+        run: bash drift-fix-claude/tests/guard-config-gate.test.sh

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Decide whether to skip, create or update the drift fix for this dir.
 #
+# - Vertex AI (WIF) inputs not configured   -> skip (auto-fix is optional;
+#                                              drift-check-only callers pass
+#                                              through without a fix attempt)
 # - No open drift-fix PR for this dir       -> mode=create (normal flow)
 # - Open PR with human (non-bot) commits    -> skip (ownership moved to a human)
 # - Open PR whose branch still plans clean  -> skip (the PR still resolves
@@ -17,13 +20,22 @@
 # in has-human-commits.jq, and the plan execution in run-verify-plan.sh
 # (all shared with their unit tests under ../tests/).
 #
-# Env:    DIR, BASE_BRANCH, GH_TOKEN, TF_BINARY
+# Env:    DIR, BASE_BRANCH, GH_TOKEN, TF_BINARY,
+#         WORKLOAD_IDENTITY_PROVIDER, SERVICE_ACCOUNT
 # Writes: skip / mode / branch / existing-pr-number to GITHUB_OUTPUT,
 #         summary line to GITHUB_STEP_SUMMARY, on mode=update the fresh
 #         plan output to /tmp/plan.txt
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Auto-fix is optional: without both Vertex AI (WIF) inputs the Claude step
+# cannot authenticate, so skip the whole fix before doing any work.
+if [ -z "${WORKLOAD_IDENTITY_PROVIDER:-}" ] || [ -z "${SERVICE_ACCOUNT:-}" ]; then
+  echo "skip=true" >> "$GITHUB_OUTPUT"
+  echo "Skipped drift fix for \`$DIR\`: automatic drift fix is not configured (workload-identity-provider / service-account not provided)." >> "$GITHUB_STEP_SUMMARY"
+  exit 0
+fi
 
 # --limit 200: default is 30; raise it so drift-fix PRs are not buried.
 PRS=$(gh pr list \

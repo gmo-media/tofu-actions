@@ -15,11 +15,15 @@ inputs:
   github-token:
     description: GitHub token (GitHub App or PAT is required to trigger workflows)
   workload-identity-provider:
-    description: Workload Identity Provider for Google Cloud authentication (required for Vertex AI)
-    required: true
+    description: >-
+      Workload Identity Provider for Google Cloud authentication (Vertex AI).
+      Automatic drift fix requires both this and service-account; when either
+      is omitted the action skips without attempting a fix.
   service-account:
-    description: Service account email for Google Cloud authentication (required for Vertex AI)
-    required: true
+    description: >-
+      Service account email for Google Cloud authentication (Vertex AI).
+      Automatic drift fix requires both this and workload-identity-provider;
+      when either is omitted the action skips without attempting a fix.
   anthropic-vertex-project-id:
     description: Anthropic Vertex AI project ID
   cloud-ml-region:
@@ -39,7 +43,7 @@ outputs:
     description: Name of the branch with fixes (the existing PR's branch when it was updated; empty when skipped)
     value: ${{ steps.branch.outputs.name }}
   skipped:
-    description: "true if an open drift-fix PR already existed and still resolves the drift (or a human has committed to it), so the fix was skipped"
+    description: "true if the fix was skipped: auto-fix is not configured (missing Vertex AI inputs), or an open drift-fix PR already resolves the drift (or a human has committed to it)"
     value: ${{ steps.guard.outputs.skip }}
   existing-pr-number:
     description: Number of the existing open drift-fix PR when skipped or updated (otherwise empty)
@@ -60,8 +64,9 @@ runs:
         dir: ${{ inputs.dir }}
 
     # Decide skip / create / update before the costly Claude run. Skips when
-    # an open drift-fix PR still resolves the drift (or a human committed to
-    # it); hands off mode=update when the PR went stale because new drift
+    # auto-fix is not configured (missing Vertex AI inputs), or when an open
+    # drift-fix PR still resolves the drift (or a human committed to it);
+    # hands off mode=update when the PR went stale because new drift
     # appeared after it was created. See scripts/guard-existing-pr.sh.
     - name: Check existing drift-fix PR (skip / create / update)
       id: guard
@@ -71,6 +76,8 @@ runs:
         DIR: ${{ inputs.dir }}
         BASE_BRANCH: ${{ inputs.base-branch }}
         TF_BINARY: ${{ steps.config.outputs.tf-binary }}
+        WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload-identity-provider }}
+        SERVICE_ACCOUNT: ${{ inputs.service-account }}
       run: '"$GITHUB_ACTION_PATH/scripts/guard-existing-pr.sh"'
 
     # Create a new branch for the fix, or reuse the existing PR branch in
