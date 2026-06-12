@@ -17,6 +17,10 @@ fi
 
 git add -A
 
+# COUPLING (keep in sync): never add a Co-Authored-By trailer to this
+# message. GitHub resolves co-authors as commit authors, so
+# has-human-commits.jq would classify the bot's own commits as human and
+# permanently disable the guard's update mode for the PR.
 COMMIT_MSG="fix: Auto-fix infrastructure drift in $DIR
 
 This commit automatically fixes infrastructure drift detected in $DIR.
