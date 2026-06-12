@@ -14,6 +14,16 @@ inputs:
 
   github-token:
     description: GitHub token (GitHub App or PAT is required to trigger workflows)
+  workload-identity-provider:
+    description: >-
+      Workload Identity Provider for Google Cloud authentication (Vertex AI).
+      Automatic drift fix requires both this and service-account; when either
+      is omitted the action skips without attempting a fix.
+  service-account:
+    description: >-
+      Service account email for Google Cloud authentication (Vertex AI).
+      Automatic drift fix requires both this and workload-identity-provider;
+      when either is omitted the action skips without attempting a fix.
   anthropic-vertex-project-id:
     description: Anthropic Vertex AI project ID
   cloud-ml-region:
@@ -27,154 +37,161 @@ inputs:
 
 outputs:
   pr-url:
-    description: URL of the created pull request
+    description: URL of the created or updated pull request (empty when skipped)
     value: ${{ steps.create-pr.outputs.pr-url }}
   branch-name:
-    description: Name of the branch with fixes
+    description: Name of the branch with fixes (the existing PR's branch when it was updated; empty when skipped)
     value: ${{ steps.branch.outputs.name }}
+  skipped:
+    description: "true if the fix was skipped: auto-fix is not configured (missing Vertex AI inputs), or an open drift-fix PR already resolves the drift (or a human has committed to it)"
+    value: ${{ steps.guard.outputs.skip }}
+  existing-pr-number:
+    description: Number of the existing open drift-fix PR when skipped or updated (otherwise empty)
+    value: ${{ steps.guard.outputs.existing-pr-number }}
+  fix-verified:
+    description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created or updated unverified, empty when no PR was created"
+    value: ${{ steps.verify.outputs.fix-verified }}
 
 runs:
   using: composite
   steps:
+    # read-config runs before the guard because the guard needs tf-binary
+    # to re-run plan on an existing PR's branch for the stale check.
     - id: config
       uses: gmo-media/tofu-actions/read-config@v5
       with:
         config: ${{ inputs.config }}
         dir: ${{ inputs.dir }}
 
-    # Create a new branch for the fix
+    # Decide skip / create / update before the costly Claude run. Skips when
+    # auto-fix is not configured (missing Vertex AI inputs), or when an open
+    # drift-fix PR still resolves the drift (or a human committed to it);
+    # hands off mode=update when the PR went stale because new drift
+    # appeared after it was created. See scripts/guard-existing-pr.sh.
+    - name: Check existing drift-fix PR (skip / create / update)
+      id: guard
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
+        DIR: ${{ inputs.dir }}
+        BASE_BRANCH: ${{ inputs.base-branch }}
+        TF_BINARY: ${{ steps.config.outputs.tf-binary }}
+        WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload-identity-provider }}
+        SERVICE_ACCOUNT: ${{ inputs.service-account }}
+      run: '"$GITHUB_ACTION_PATH/scripts/guard-existing-pr.sh"'
+
+    # Create a new branch for the fix, or reuse the existing PR branch in
+    # update mode. See scripts/create-fix-branch.sh.
     - name: Create fix branch
+      if: ${{ steps.guard.outputs.skip != 'true' }}
       id: branch
       shell: bash
-      run: |
-        BRANCH_NAME="fix-drift-$(echo '${{ inputs.dir }}' | tr '/' '-')-$(date +%Y%m%d-%H%M%S)"
-        git checkout -b "$BRANCH_NAME"
-        echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+      env:
+        DIR: ${{ inputs.dir }}
+        MODE: ${{ steps.guard.outputs.mode }}
+        EXISTING_BRANCH: ${{ steps.guard.outputs.branch }}
+      run: '"$GITHUB_ACTION_PATH/scripts/create-fix-branch.sh"'
 
+    # In update mode the guard already wrote the PR branch's fresh plan to
+    # /tmp/plan.txt; the `plan` input reflects the base branch and would be
+    # wrong for the re-run.
     - name: Save plan to file
+      if: ${{ steps.guard.outputs.skip != 'true' && steps.guard.outputs.mode == 'create' }}
       shell: bash
       env:
         PLAN: ${{ inputs.plan }}
       run: echo "$PLAN" > /tmp/plan.txt
 
-    # Use Claude Code to fix the drift
+    # Authenticate to Google Cloud for Vertex AI. The credentials are NOT
+    # exported as job-wide env vars: configure@v5 already set up ADC for
+    # Terraform/OpenTofu, and overwriting GOOGLE_APPLICATION_CREDENTIALS here
+    # would break the guard/verify plan runs that follow. The credentials
+    # file is passed to the Claude step alone via its step env below.
+    - name: Authenticate to Google Cloud
+      if: ${{ steps.guard.outputs.skip != 'true' }}
+      id: vertex-auth
+      uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+      with:
+        workload_identity_provider: ${{ inputs.workload-identity-provider }}
+        service_account: ${{ inputs.service-account }}
+        export_environment_variables: false
+
+    # The auth action writes gha-creds-*.json into the workspace and
+    # commit-and-push.sh runs `git add -A`. configure@v5 only adds this
+    # ignore in gcp-oidc mode, so repeat it here unconditionally to keep
+    # credentials out of the fix PR.
+    - name: Ignore generated credentials from google-github-actions/auth
+      if: ${{ steps.guard.outputs.skip != 'true' }}
+      shell: bash
+      run: |
+        mkdir -p ~/.config/git
+        echo "gha-creds-*.json" >> ~/.config/git/ignore
+
+    # Use Claude Code to fix the drift. The prompt lives in
+    # .claude/skills/fix-drift/SKILL.md at the repository root (the parent of
+    # the action path); --add-dir makes Claude Code auto-load skills from
+    # that directory's .claude/skills.
+    # COUPLING (keep in sync): the /fix-drift argument order must match the
+    # `arguments:` declaration in that SKILL.md (checked by
+    # tests/fix-drift-skill.test.sh).
+    # Pin >= v1.0.144: older releases (e.g. v1.0.37) pin a Claude Code CLI
+    # that predates skill auto-loading from --add-dir directories (2.1.32).
     - name: Fix drift with Claude Code
-      uses: anthropics/claude-code-base-action@eee9e25eaeacec8bd408cda169d11f0e2e5c02c6
-      continue-on-error: true
+      if: ${{ steps.guard.outputs.skip != 'true' }}
+      uses: anthropics/claude-code-action@15b5879e769f1b8e7f7fddda7358a557995e9841 # v1.0.144
       env:
+        GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.vertex-auth.outputs.credentials_file_path }}
         ANTHROPIC_VERTEX_PROJECT_ID: ${{ inputs.anthropic-vertex-project-id }}
         CLOUD_ML_REGION: ${{ inputs.cloud-ml-region }}
         ANTHROPIC_MODEL: ${{ inputs.anthropic-model }}
       with:
         use_vertex: "true"
+        github_token: ${{ inputs.github-token || github.token }}
+        prompt: /fix-drift ${{ inputs.dir }} ${{ steps.config.outputs.tf-binary }} /tmp/plan.txt
         claude_args: >-
+          --add-dir "${{ github.action_path }}/.."
           --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write"
-          --disallowedTools "Bash(${{ steps.config.outputs.tf-binary }} apply),Bash(git commit),Bash(git push)"
-        prompt: |
-          # CRITICAL INSTRUCTIONS FOR FIXING INFRASTRUCTURE DRIFT
-          You have been given a critical task to fix infrastructure drift in Terraform/OpenTofu configuration files.
-          Your goal is to update the .tf files to match the current real-world infrastructure state.
+          --disallowedTools "Bash(${{ steps.config.outputs.tf-binary }} apply:*),Bash(git commit:*),Bash(git push:*)"
 
-          ## Important Rules
-          - NEVER run `${{ steps.config.outputs.tf-binary }} apply` even if there is a need to update tfstate. Preserve the existing infrastructure state.
-          - Only make changes to .tf files and run `${{ steps.config.outputs.tf-binary }} plan`.
-          - Always choose the least destructive approach. Be surgical and precise with your edits.
-
-          ## Context
-          - Directory with drift: ${{ inputs.dir }}
-          - The plan result is in /tmp/plan.txt
-
-          ## YOUR MISSION - FOLLOW THESE STEPS EXACTLY:
-          1. Read the plan and understand the changes
-          The plan is trying to *revert* the external changes done to the infrastructure.
-          For example, if the plan shows:
-          ```
-          ~ resource "aws_instance" "example" {
-              ~ instance_type = "t3.micro" -> "t2.micro"
-          }
-          ```
-          "t3.micro" is the real infrastructure state, while "t2.micro" is what's in our .tf files.
-          This means a user may have manually changed the instance type from t2.micro to t3.micro, and didn't update the .tf file.
-          You should update the .tf file to match reality - "t3.micro".
-
-          The plan is usually quite verbose with default values.
-          Try not to be confused by these verbose lines - try to extract only the important changes.
-
-          2. Fix the drift
-          Update .tf files to match the CURRENT REAL INFRASTRUCTURE STATE.
-          This means: incorporate the external changes into your .tf files.
-
-          3. Validate
-          After making changes, run: `${{ steps.config.outputs.tf-binary }} plan` within directory `${{ inputs.dir }}`.
-          The plan MUST show "No changes. Your infrastructure matches the configuration."
-          If there are still differences, continue fixing until plan shows no changes.
-
-    # Commit the changes (whether successful or not, for debugging)
-    - name: Commit changes
+    # No-change gate: deterministically verify Claude's fix by re-running
+    # plan and requiring "No changes". A remaining plan that would destroy
+    # and recreate (-/+) a resource is never handed off, even as a draft PR.
+    # See scripts/verify-drift-resolved.sh; the verdict mapping lives in
+    # scripts/no-change-gate.sh (shared with tests/no-change-gate.test.sh).
+    - name: Verify drift is resolved (no-change gate)
+      id: verify
+      if: ${{ steps.guard.outputs.skip != 'true' }}
       shell: bash
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      env:
+        DIR: ${{ inputs.dir }}
+        TF_BINARY: ${{ steps.config.outputs.tf-binary }}
+      run: '"$GITHUB_ACTION_PATH/scripts/verify-drift-resolved.sh"'
 
-        # Check if there are changes to commit
-        if git diff --exit-code; then
-          echo "No changes to commit"
-          exit 0
-        fi
+    # Commit the changes (also for unverified fixes, so they can be handed
+    # off to a human as a draft PR). See scripts/commit-and-push.sh.
+    - name: Commit changes
+      if: ${{ steps.guard.outputs.skip != 'true' && (steps.verify.outputs.verdict == 'pr' || steps.verify.outputs.verdict == 'draft-pr') }}
+      shell: bash
+      env:
+        DIR: ${{ inputs.dir }}
+        BRANCH_NAME: ${{ steps.branch.outputs.name }}
+      run: '"$GITHUB_ACTION_PATH/scripts/commit-and-push.sh"'
 
-        git add -A
-
-        COMMIT_MSG="fix: Auto-fix infrastructure drift in ${{ inputs.dir }}
-
-        This commit automatically fixes infrastructure drift detected in ${{ inputs.dir }}.
-        The changes update the Terraform/OpenTofu configuration to match the current
-        real-world infrastructure state.
-
-        Automated by Claude Code drift fixer"
-
-        git commit -m "$COMMIT_MSG"
-        git push origin ${{ steps.branch.outputs.name }}
-        echo "Changes committed and pushed to branch ${{ steps.branch.outputs.name }}"
-
-    # Create a pull request if changes were made
-    - name: Create Pull Request
+    # Create a pull request if changes were made, or update the existing one
+    # in update mode (title/body/draft state synced to the verdict plus a
+    # notification comment). Unverified fixes (verdict=draft-pr) become a
+    # draft PR so a human can finish the fix. See scripts/create-pr.sh.
+    - name: Create or update Pull Request
+      if: ${{ steps.guard.outputs.skip != 'true' && (steps.verify.outputs.verdict == 'pr' || steps.verify.outputs.verdict == 'draft-pr') }}
       id: create-pr
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token || github.token }}
-      run: |
-        # Check if changes were pushed
-        if ! git rev-parse --verify origin/${{ steps.branch.outputs.name }} >/dev/null 2>&1; then
-          echo "No changes were pushed, skipping PR creation"
-          exit 0
-        fi
-
-        # Using GitHub CLI to create PR
-        PR_URL=$(gh pr create \
-            --title "🔧 Auto-fix infrastructure drift in ${{ inputs.dir }}" \
-            --base "${{ inputs.base-branch }}" \
-            --head "${{ steps.branch.outputs.name }}" \
-            --body "## 🤖 Automated Drift Fix
-
-        This PR is an automatic attempt to fix infrastructure drift in \`${{ inputs.dir }}\`.
-
-        ### What happened?
-        Infrastructure drift was detected during the drift check. This means the real-world infrastructure 
-        state differs from what's defined in the Terraform/OpenTofu configuration files.
-
-        ### What this PR does
-        - Updates the .tf configuration files to match the current real infrastructure state
-        - Makes minimal, non-destructive changes
-        - Ensures \`${{ steps.config.outputs.tf-binary }}  plan\` shows \"No changes\" after the fix
-
-        ### Review checklist
-        - [ ] Review the changes to ensure they correctly reflect the infrastructure state
-        - [ ] Verify that only drifted values were updated
-        - [ ] Confirm no unnecessary default values were added
-        - [ ] Check that the changes are minimal and non-destructive
-
-        ---
-        *This PR was automatically generated by the drift fix workflow using Claude Code.*")
-
-        echo "Pull request created: $PR_URL"
-        echo "pr-url=$PR_URL" >> $GITHUB_OUTPUT
+        DIR: ${{ inputs.dir }}
+        TF_BINARY: ${{ steps.config.outputs.tf-binary }}
+        BASE_BRANCH: ${{ inputs.base-branch }}
+        BRANCH_NAME: ${{ steps.branch.outputs.name }}
+        VERDICT: ${{ steps.verify.outputs.verdict }}
+        MODE: ${{ steps.guard.outputs.mode }}
+        EXISTING_PR_NUMBER: ${{ steps.guard.outputs.existing-pr-number }}
+      run: '"$GITHUB_ACTION_PATH/scripts/create-pr.sh"'
