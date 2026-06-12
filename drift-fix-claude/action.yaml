@@ -14,23 +14,18 @@ inputs:
 
   github-token:
     description: GitHub token (GitHub App or PAT is required to trigger workflows)
-  anthropic-api-key:
-    description: Anthropic API key (not needed when use-vertex is true)
-  claude-code-oauth-token:
-    description: Claude Code OAuth token (alternative to anthropic_api_key)
-  use-vertex:
-    description: >-
-      Use Google Vertex AI instead of the Anthropic API. Requires GCP
-      credentials set up beforehand (e.g. google-github-actions/auth with
-      workload identity) and vertex-project-id.
-    default: 'false'
-  vertex-project-id:
-    description: GCP project ID for Vertex AI (required when use-vertex is true)
-  vertex-region:
-    description: Vertex AI region (CLOUD_ML_REGION) used when use-vertex is true
-    default: global
-  model:
-    description: "Model to use (e.g. claude-sonnet-4-6). Empty uses the Claude Code default."
+  workload-identity-provider:
+    description: Workload Identity Provider for Google Cloud authentication (required for Vertex AI)
+    required: true
+  service-account:
+    description: Service account email for Google Cloud authentication (required for Vertex AI)
+    required: true
+  anthropic-vertex-project-id:
+    description: Anthropic Vertex AI project ID
+  cloud-ml-region:
+    description: Cloud ML region for Vertex AI
+  anthropic-model:
+    description: Anthropic model to use
 
   base-branch:
     description: Base branch for the PR
