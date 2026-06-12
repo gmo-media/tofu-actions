@@ -22,17 +22,10 @@ else
   HAS_DIFF=false
 fi
 
-# tofu supports -concise to drop the refresh noise; terraform does not
-CONCISE_FLAG=""
-case "$TF_BINARY" in
-  *tofu*) CONCISE_FLAG="-concise" ;;
-esac
-
+# Plan execution (flags, output capture) is shared with the guard's
+# stale-PR detection; see scripts/run-verify-plan.sh.
 set +e
-# -no-color: the output is embedded in the PR body / job summary.
-# 2>&1: plan errors go to stderr; capture them so the fail branch and
-# the draft PR body are not empty on exit code 1.
-(cd "$DIR" && "$TF_BINARY" plan -no-color -lock-timeout=300s $CONCISE_FLAG -detailed-exitcode) > /tmp/verify-plan.txt 2>&1
+"$SCRIPT_DIR/run-verify-plan.sh" /tmp/verify-plan.txt
 PLAN_EXIT_CODE=$?
 set -e
 
