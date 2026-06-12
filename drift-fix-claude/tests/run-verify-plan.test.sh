@@ -25,12 +25,13 @@ WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/dir"
 
-# Stub tf binary: records its args, prints to stdout and stderr,
-# exits with the code given in $STUB_EXIT.
+# Stub tf binary: records its args and working directory, prints to stdout and
+# stderr, exits with the code given in $STUB_EXIT.
 make_stub() {
   cat > "$1" <<'STUB'
 #!/usr/bin/env bash
 echo "$@" > "${STUB_ARGS_FILE:?}"
+pwd >> "${STUB_ARGS_FILE:?}"
 echo "stub stdout"
 echo "stub stderr" >&2
 exit "${STUB_EXIT:?}"
@@ -45,6 +46,10 @@ make_stub "$WORK/faketofu"
 STUB_ARGS_FILE="$WORK/args" STUB_EXIT=0 DIR="$WORK/dir" TF_BINARY="$WORK/terraform" \
   bash "$RUNNER" "$WORK/out.txt"
 check "exit 0 passes through" $?
+
+# スタブが $DIR 内で実行される（cwd の検証）
+grep -qF "$WORK/dir" "$WORK/args"
+check "plan runs inside DIR" $?
 
 # stdout と stderr の両方がキャプチャされる
 grep -q "stub stdout" "$WORK/out.txt" && grep -q "stub stderr" "$WORK/out.txt"
@@ -68,17 +73,23 @@ STUB_ARGS_FILE="$WORK/args" STUB_EXIT=0 DIR="$WORK/dir" TF_BINARY="$WORK/terrafo
 ! grep -q -- "-concise" "$WORK/args"
 check "terraform does not get -concise" $?
 
+# 共通の plan フラグが常に渡る（terraform）
+grep -q -- "-no-color" "$WORK/args" \
+  && grep -q -- "-detailed-exitcode" "$WORK/args" \
+  && grep -q -- "-lock-timeout=300s" "$WORK/args"
+check "plan flags are passed (terraform)" $?
+
 # tofu には -concise を付ける
 STUB_ARGS_FILE="$WORK/args" STUB_EXIT=0 DIR="$WORK/dir" TF_BINARY="$WORK/faketofu" \
   bash "$RUNNER" "$WORK/out.txt"
 grep -q -- "-concise" "$WORK/args"
 check "tofu gets -concise" $?
 
-# 共通の plan フラグが常に渡る
+# 共通の plan フラグが常に渡る（tofu）
 grep -q -- "-no-color" "$WORK/args" \
   && grep -q -- "-detailed-exitcode" "$WORK/args" \
   && grep -q -- "-lock-timeout=300s" "$WORK/args"
-check "plan flags are passed" $?
+check "plan flags are passed (tofu)" $?
 
 echo "---"
 echo "passed: $pass, failed: $fail"
