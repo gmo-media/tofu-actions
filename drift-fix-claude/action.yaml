@@ -16,13 +16,10 @@ inputs:
     description: GitHub token (GitHub App or PAT is required to trigger workflows)
   anthropic-vertex-project-id:
     description: Anthropic Vertex AI project ID
-    default: gmomediadatadev
   cloud-ml-region:
     description: Cloud ML region for Vertex AI
-    default: global
   anthropic-model:
     description: Anthropic model to use
-    default: claude-sonnet-4-6
 
   base-branch:
     description: Base branch for the PR
