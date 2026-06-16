@@ -17,15 +17,20 @@ inputs:
   workload-identity-provider:
     description: >-
       Workload Identity Provider for Google Cloud authentication (Vertex AI).
-      Automatic drift fix requires both this and service-account; when either
-      is omitted the action skips without attempting a fix.
+      Automatic drift fix requires this, service-account and
+      anthropic-vertex-project-id; when any is omitted the action skips
+      without attempting a fix.
   service-account:
     description: >-
       Service account email for Google Cloud authentication (Vertex AI).
-      Automatic drift fix requires both this and workload-identity-provider;
-      when either is omitted the action skips without attempting a fix.
+      Automatic drift fix requires this, workload-identity-provider and
+      anthropic-vertex-project-id; when any is omitted the action skips
+      without attempting a fix.
   anthropic-vertex-project-id:
-    description: Anthropic Vertex AI project ID
+    description: >-
+      Anthropic Vertex AI project ID. Required for automatic drift fix
+      alongside workload-identity-provider and service-account; when any is
+      omitted the action skips without attempting a fix.
   cloud-ml-region:
     description: Cloud ML region for Vertex AI
   anthropic-model:
@@ -78,6 +83,7 @@ runs:
         TF_BINARY: ${{ steps.config.outputs.tf-binary }}
         WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload-identity-provider }}
         SERVICE_ACCOUNT: ${{ inputs.service-account }}
+        ANTHROPIC_VERTEX_PROJECT_ID: ${{ inputs.anthropic-vertex-project-id }}
       run: '"$GITHUB_ACTION_PATH/scripts/guard-existing-pr.sh"'
 
     # Create a new branch for the fix, or reuse the existing PR branch in

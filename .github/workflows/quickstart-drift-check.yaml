@@ -78,12 +78,15 @@ jobs:
           else
             echo "do-notify=false" >> $GITHUB_OUTPUT
           fi
-      # Auto-fix runs when the Vertex AI (Workload Identity Federation)
-      # inputs are provided; both are required by drift-fix-claude.
+      # Auto-fix runs when the Vertex AI inputs are provided; the WIF pair
+      # (workload-identity-provider / service-account) plus
+      # anthropic-vertex-project-id are all required by drift-fix-claude.
+      # Without the project id, auth succeeds but the Claude step fails, so
+      # gate on it here too rather than letting every cron run go red.
       - id: check-auto-fix
         shell: bash
         run: |
-          if [ -n "${{ inputs.workload-identity-provider }}" ] && [ -n "${{ inputs.service-account }}" ]; then
+          if [ -n "${{ inputs.workload-identity-provider }}" ] && [ -n "${{ inputs.service-account }}" ] && [ -n "${{ inputs.anthropic-vertex-project-id }}" ]; then
             echo "do-auto-fix=true" >> $GITHUB_OUTPUT
             echo "drift-message=Claude is on the way to creating a PR..." >> $GITHUB_OUTPUT
           else

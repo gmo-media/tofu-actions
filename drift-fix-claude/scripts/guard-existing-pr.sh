@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Decide whether to skip, create or update the drift fix for this dir.
 #
-# - Vertex AI (WIF) inputs not configured   -> skip (auto-fix is optional;
-#                                              drift-check-only callers pass
+# - Vertex AI inputs not configured         -> skip (auto-fix is optional;
+#   (WIF pair or anthropic-vertex-project-id)  drift-check-only callers pass
 #                                              through without a fix attempt)
 # - No open drift-fix PR for this dir       -> mode=create (normal flow)
 # - Open PR with human (non-bot) commits    -> skip (ownership moved to a human)
@@ -21,7 +21,8 @@
 # (all shared with their unit tests under ../tests/).
 #
 # Env:    DIR, BASE_BRANCH, GH_TOKEN, TF_BINARY,
-#         WORKLOAD_IDENTITY_PROVIDER, SERVICE_ACCOUNT
+#         WORKLOAD_IDENTITY_PROVIDER, SERVICE_ACCOUNT,
+#         ANTHROPIC_VERTEX_PROJECT_ID
 # Writes: skip / mode / branch / existing-pr-number to GITHUB_OUTPUT,
 #         summary line to GITHUB_STEP_SUMMARY, on mode=update the fresh
 #         plan output to /tmp/plan.txt
@@ -29,11 +30,12 @@ set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Auto-fix is optional: without both Vertex AI (WIF) inputs the Claude step
-# cannot authenticate, so skip the whole fix before doing any work.
-if [ -z "${WORKLOAD_IDENTITY_PROVIDER:-}" ] || [ -z "${SERVICE_ACCOUNT:-}" ]; then
+# Auto-fix is optional: without the WIF pair the Claude step cannot
+# authenticate, and without anthropic-vertex-project-id it authenticates but
+# then fails. Require all three and skip the whole fix before doing any work.
+if [ -z "${WORKLOAD_IDENTITY_PROVIDER:-}" ] || [ -z "${SERVICE_ACCOUNT:-}" ] || [ -z "${ANTHROPIC_VERTEX_PROJECT_ID:-}" ]; then
   echo "skip=true" >> "$GITHUB_OUTPUT"
-  echo "Skipped drift fix for \`$DIR\`: automatic drift fix is not configured (workload-identity-provider / service-account not provided)." >> "$GITHUB_STEP_SUMMARY"
+  echo "Skipped drift fix for \`$DIR\`: automatic drift fix is not configured (workload-identity-provider / service-account / anthropic-vertex-project-id not all provided)." >> "$GITHUB_STEP_SUMMARY"
   exit 0
 fi
 
