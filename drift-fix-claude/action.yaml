@@ -56,6 +56,12 @@ outputs:
   fix-verified:
     description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created or updated unverified, empty when no PR was created"
     value: ${{ steps.verify.outputs.fix-verified }}
+  summary:
+    description: >-
+      One-line human-readable outcome for notification: the skip reason, or
+      the PR result with its URL. Empty when the action hard-fails (the
+      caller should derive a failure message itself).
+    value: ${{ steps.guard.outputs.summary || steps.create-pr.outputs.summary || steps.verify.outputs.summary }}
 
 runs:
   using: composite
