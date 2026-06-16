@@ -148,9 +148,18 @@ runs:
     # tests/fix-drift-skill.test.sh).
     # Pin >= v1.0.144: older releases (e.g. v1.0.37) pin a Claude Code CLI
     # that predates skill auto-loading from --add-dir directories (2.1.32).
+    # continue-on-error: a mid-run Claude failure (API error, credential
+    # expiry, max-turns) may still leave useful partial edits. Do NOT let it
+    # abort the action; the no-change gate below re-runs plan and decides the
+    # fate of whatever was edited: a clean plan becomes a verified PR, a
+    # remaining plan a draft PR for a human to finish, and a destructive
+    # (-/+) or empty result still fails. Removing this discards partial work
+    # and reds the job before verify can run (regression seen when migrating
+    # off claude-code-base-action, which had this set).
     - name: Fix drift with Claude Code
       if: ${{ steps.guard.outputs.skip != 'true' }}
       uses: anthropics/claude-code-action@15b5879e769f1b8e7f7fddda7358a557995e9841 # v1.0.144
+      continue-on-error: true
       env:
         GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.vertex-auth.outputs.credentials_file_path }}
         ANTHROPIC_VERTEX_PROJECT_ID: ${{ inputs.anthropic-vertex-project-id }}
