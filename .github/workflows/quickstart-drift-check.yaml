@@ -4,7 +4,6 @@ name: Drift Check
 on:
   workflow_call:
     inputs:
-      # Setting both workload-identity-provider and service-account enables
       # automatic drift fix via Claude Code on Vertex AI.
       workload-identity-provider:
         description: Workload Identity Provider for Google Cloud authentication (Vertex AI)
@@ -86,8 +85,10 @@ jobs:
         run: |
           if [ -n "${{ inputs.workload-identity-provider }}" ] && [ -n "${{ inputs.service-account }}" ]; then
             echo "do-auto-fix=true" >> $GITHUB_OUTPUT
+            echo "drift-message=Claude is on the way to creating a PR..." >> $GITHUB_OUTPUT
           else
             echo "do-auto-fix=false" >> $GITHUB_OUTPUT
+            echo "drift-message=Please review the changes and fix manually." >> $GITHUB_OUTPUT
           fi
 
       - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'true' }}
@@ -95,7 +96,7 @@ jobs:
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
-          additional-message: ${{ steps.check-auto-fix.outputs.do-auto-fix == 'true' && 'Claude is on the way to creating a PR...' || 'Please review the changes and fix manually.' }}
+          additional-message: ${{ steps.check-auto-fix.outputs.drift-message }}
           webhook: ${{ secrets.drift-notify-webhook }}
 
       - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-auto-fix.outputs.do-auto-fix == 'true' }}
