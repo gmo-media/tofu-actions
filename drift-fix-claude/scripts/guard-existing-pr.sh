@@ -23,7 +23,7 @@
 # Env:    DIR, BASE_BRANCH, GH_TOKEN, TF_BINARY,
 #         WORKLOAD_IDENTITY_PROVIDER, SERVICE_ACCOUNT,
 #         ANTHROPIC_VERTEX_PROJECT_ID
-# Writes: skip / mode / branch / existing-pr-number to GITHUB_OUTPUT,
+# Writes: skip / mode / branch / existing-pr-number / summary to GITHUB_OUTPUT,
 #         summary line to GITHUB_STEP_SUMMARY, on mode=update the fresh
 #         plan output to /tmp/plan.txt
 set -eo pipefail
@@ -34,7 +34,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # authenticate, and without anthropic-vertex-project-id it authenticates but
 # then fails. Require all three and skip the whole fix before doing any work.
 if [ -z "${WORKLOAD_IDENTITY_PROVIDER:-}" ] || [ -z "${SERVICE_ACCOUNT:-}" ] || [ -z "${ANTHROPIC_VERTEX_PROJECT_ID:-}" ]; then
-  echo "skip=true" >> "$GITHUB_OUTPUT"
+  {
+    echo "skip=true"
+    echo "summary=Drift detected in \`$DIR\`; automatic fix is not configured. Review and fix manually."
+  } >> "$GITHUB_OUTPUT"
   echo "Skipped drift fix for \`$DIR\`: automatic drift fix is not configured (workload-identity-provider / service-account / anthropic-vertex-project-id not all provided)." >> "$GITHUB_STEP_SUMMARY"
   exit 0
 fi
@@ -66,6 +69,7 @@ if [ "$HAS_HUMAN" = "true" ]; then
   {
     echo "skip=true"
     echo "existing-pr-number=$EXISTING_PR"
+    echo "summary=Drift detected in \`$DIR\`; open PR #$EXISTING_PR has human commits (handled manually)."
   } >> "$GITHUB_OUTPUT"
   echo "Skipped drift fix for \`$DIR\`: open PR #$EXISTING_PR has human commits." >> "$GITHUB_STEP_SUMMARY"
   exit 0
@@ -95,6 +99,7 @@ case "$PLAN_EXIT_CODE" in
     {
       echo "skip=true"
       echo "existing-pr-number=$EXISTING_PR"
+      echo "summary=Drift detected in \`$DIR\`; open PR #$EXISTING_PR already resolves it."
     } >> "$GITHUB_OUTPUT"
     echo "Skipped drift fix for \`$DIR\`: open PR #$EXISTING_PR still resolves the drift." >> "$GITHUB_STEP_SUMMARY"
     ;;
