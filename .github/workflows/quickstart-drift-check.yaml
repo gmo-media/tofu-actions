@@ -102,7 +102,7 @@ jobs:
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
-          additional-message: ${{ steps.fix.outputs.summary }}
+          additional-message: ${{ steps.fix.outputs.summary || 'Please review the changes and fix manually.' }}
           webhook: ${{ secrets.drift-notify-webhook }}
 
       # The automatic fix hard-failed (e.g. the plan would replace resources,
