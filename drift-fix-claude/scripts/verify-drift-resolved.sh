@@ -6,8 +6,8 @@
 # tests/no-change-gate.test.sh).
 #
 # Env:    DIR, TF_BINARY
-# Writes: verdict / fix-verified to GITHUB_OUTPUT, summary to
-#         GITHUB_STEP_SUMMARY, plan output (stdout+stderr) to
+# Writes: verdict / fix-verified / summary (resolved only) to GITHUB_OUTPUT,
+#         summary to GITHUB_STEP_SUMMARY, plan output (stdout+stderr) to
 #         /tmp/verify-plan.txt (reused by create-pr.sh for the draft PR body)
 set -eo pipefail
 
@@ -56,6 +56,7 @@ case "$VERDICT" in
     ;;
   resolved)
     echo "Drift in \`$DIR\` is already resolved; skipping PR creation." >> "$GITHUB_STEP_SUMMARY"
+    echo "summary=Drift in \`$DIR\` was already resolved; no PR needed." >> "$GITHUB_OUTPUT"
     ;;
   draft-pr)
     {
