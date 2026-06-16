@@ -8,7 +8,7 @@
 # Env:    GH_TOKEN, DIR, TF_BINARY, BASE_BRANCH, BRANCH_NAME, VERDICT,
 #         MODE, EXISTING_PR_NUMBER (only when MODE=update)
 # Reads:  /tmp/verify-plan.txt (written by verify-drift-resolved.sh)
-# Writes: pr-url to GITHUB_OUTPUT
+# Writes: pr-url / summary to GITHUB_OUTPUT
 set -eo pipefail
 
 # Check if changes were pushed. In update mode the PR branch always exists
@@ -104,3 +104,8 @@ else
   echo "Pull request created: $PR_URL"
 fi
 echo "pr-url=$PR_URL" >> "$GITHUB_OUTPUT"
+if [ "$VERDICT" = "draft-pr" ]; then
+  echo "summary=Claude opened a draft drift-fix PR for \`$DIR\` (verification failed — needs a human): $PR_URL" >> "$GITHUB_OUTPUT"
+else
+  echo "summary=Claude opened a verified drift-fix PR for \`$DIR\`: $PR_URL" >> "$GITHUB_OUTPUT"
+fi
