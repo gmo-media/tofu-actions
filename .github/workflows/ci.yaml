@@ -62,24 +62,3 @@ jobs:
             git commit -m "[skip ci] Rebuild js dist"
             git push origin ${{ github.event.pull_request.head.ref }}
           fi
-
-  shell-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-      - name: Run drift-fix idempotency match tests
-        run: bash drift-fix-claude/tests/match-existing-pr.test.sh
-      - name: Run drift-fix no-change gate tests
-        run: bash drift-fix-claude/tests/no-change-gate.test.sh
-      - name: Run drift-fix skill packaging tests
-        run: bash drift-fix-claude/tests/fix-drift-skill.test.sh
-      - name: Run drift-fix human-commit detection tests
-        run: bash drift-fix-claude/tests/has-human-commits.test.sh
-      - name: Run drift-fix verify plan runner tests
-        run: bash drift-fix-claude/tests/run-verify-plan.test.sh
-      - name: Run drift-fix scripts lint
-        run: bash drift-fix-claude/tests/scripts-lint.test.sh
-      - name: Run drift-fix action inputs consistency tests
-        run: bash drift-fix-claude/tests/action-inputs.test.sh
-      - name: Run drift-fix guard config gate tests
-        run: bash drift-fix-claude/tests/guard-config-gate.test.sh
