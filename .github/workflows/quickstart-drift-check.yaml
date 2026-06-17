@@ -3,6 +3,28 @@ name: Drift Check
 
 on:
   workflow_call:
+    inputs:
+      # automatic drift fix via Claude Code on Vertex AI.
+      workload-identity-provider:
+        description: Workload Identity Provider for Google Cloud authentication (Vertex AI)
+        type: string
+        required: false
+      service-account:
+        description: Service account email for Google Cloud authentication (Vertex AI)
+        type: string
+        required: false
+      anthropic-vertex-project-id:
+        description: Anthropic Vertex AI project ID for automatic drift fix
+        type: string
+        required: false
+      cloud-ml-region:
+        description: Cloud ML region for Vertex AI
+        type: string
+        required: false
+      anthropic-model:
+        description: Anthropic model to use for automatic drift fix
+        type: string
+        required: false
     secrets:
       drift-notify-webhook:
         description: Slack webhook URL for drift notification (if omitted, the step fails on detecting drift)
@@ -10,12 +32,6 @@ on:
 
       github-token:
         description: GitHub token for creating PR in automatic drift fix (optional, required for triggering workflows)
-        required: false
-      anthropic-api-key:
-        description: Anthropic API key for automatic drift fix
-        required: false
-      claude-code-oauth-token:
-        description: Claude code OAuth token for automatic drift fix
         required: false
 
 permissions:
@@ -44,6 +60,7 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - uses: gmo-media/tofu-actions/configure@v5
         with:
           dir: ${{ matrix.dir }}
@@ -62,31 +79,41 @@ jobs:
           else
             echo "do-notify=false" >> $GITHUB_OUTPUT
           fi
-      - id: check-auto-fix
-        shell: bash
-        run: |
-          if [ -n "${{ secrets.anthropic-api-key }}" ] || [ -n "${{ secrets.claude-code-oauth-token }}" ]; then
-            echo "do-auto-fix=true" >> $GITHUB_OUTPUT
-          else
-            echo "do-auto-fix=false" >> $GITHUB_OUTPUT
-          fi
 
-      - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'true' }}
-        uses: gmo-media/tofu-actions/notify-drift@v5
-        with:
-          dir: ${{ matrix.dir }}
-          plan: ${{ steps.plan.outputs.plan }}
-          additional-message: ${{ steps.check-auto-fix.outputs.do-auto-fix == 'true' && 'Claude is on the way to creating a PR...' || 'Please review the changes and fix manually.' }}
-          webhook: ${{ secrets.drift-notify-webhook }}
-
-      - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-auto-fix.outputs.do-auto-fix == 'true' }}
+      # Always invoke the fix when drift exists; the action owns the gate
+      # decision (it self-skips when auto-fix is not configured).
+      - if: ${{ steps.plan.outputs.has-diff == 'true' }}
+        id: fix
         uses: gmo-media/tofu-actions/drift-fix-claude@v5
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
           github-token: ${{ secrets.github-token }}
-          anthropic-api-key: ${{ secrets.claude-api-key }}
-          claude-code-oauth-token: ${{ secrets.claude-code-oauth-token }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          service-account: ${{ inputs.service-account }}
+          anthropic-vertex-project-id: ${{ inputs.anthropic-vertex-project-id }}
+          cloud-ml-region: ${{ inputs.cloud-ml-region }}
+          anthropic-model: ${{ inputs.anthropic-model }}
+
+      # Notify on the fix outcome (success or internal skip). The action's
+      # summary output carries the right message (skip reason, or PR URL).
+      - if: ${{ !cancelled() && steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'true' && steps.fix.outcome == 'success' }}
+        uses: gmo-media/tofu-actions/notify-drift@v5
+        with:
+          dir: ${{ matrix.dir }}
+          plan: ${{ steps.plan.outputs.plan }}
+          additional-message: ${{ steps.fix.outputs.summary || 'Please review the changes and fix manually.' }}
+          webhook: ${{ secrets.drift-notify-webhook }}
+
+      # The automatic fix hard-failed (e.g. Claude errored). Notify with the
+      # original drift plan so a human can take over.
+      - if: ${{ !cancelled() && steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'true' && steps.fix.outcome == 'failure' }}
+        uses: gmo-media/tofu-actions/notify-drift@v5
+        with:
+          dir: ${{ matrix.dir }}
+          plan: ${{ steps.plan.outputs.plan }}
+          additional-message: "The automatic drift fix failed; manual action is needed. See the workflow logs for details."
+          webhook: ${{ secrets.drift-notify-webhook }}
 
       # Simply fail to notify the user if no webhook is given
       - if: ${{ steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'false' }}
@@ -96,7 +123,7 @@ jobs:
           exit 1
 
       # If this workflow itself is failing for some reason (e.g. plan failure), AND if webhook is configured, notify the user
-      - if: ${{ failure() && !cancelled() && steps.check-webhook.outputs.do-notify == 'true' }}
+      - if: ${{ failure() && !cancelled() && steps.check-webhook.outputs.do-notify == 'true' && steps.fix.outcome != 'failure' }}
         name: Send Slack notification
         uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2
         with:
