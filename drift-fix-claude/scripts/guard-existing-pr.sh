@@ -86,6 +86,24 @@ fi
 git fetch origin "$EXISTING_BRANCH"
 git checkout -B "$EXISTING_BRANCH" FETCH_HEAD
 
+# configure@v5 ran init against the base branch only. The PR branch (an
+# earlier Claude fix) may have added a module, changed required_providers, or
+# updated .terraform.lock.hcl; without a re-init the verify plan below fails
+# with "Module not installed" / provider mismatch (exit 1), hitting the *)
+# branch and hard-failing the job on every cron until the PR is closed.
+# Re-init on the PR branch; no-op and fast when nothing changed.
+set +e
+(cd "$DIR" && "$TF_BINARY" init -input=false) > /tmp/guard-init.txt 2>&1
+INIT_EXIT_CODE=$?
+set -e
+if [ "$INIT_EXIT_CODE" -ne 0 ]; then
+  # No checkout restore here: this step fails the job, so no later steps
+  # observe the unexpected HEAD.
+  echo "Re-init on PR #$EXISTING_PR branch \`$EXISTING_BRANCH\` failed (exit code $INIT_EXIT_CODE)." | tee -a "$GITHUB_STEP_SUMMARY"
+  cat /tmp/guard-init.txt
+  exit 1
+fi
+
 set +e
 "$SCRIPT_DIR/run-verify-plan.sh" /tmp/guard-plan.txt
 PLAN_EXIT_CODE=$?
