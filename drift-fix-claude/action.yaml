@@ -13,7 +13,12 @@ inputs:
     required: true
 
   github-token:
-    description: GitHub token (GitHub App or PAT is required to trigger workflows)
+    description: >-
+      Token for PR creation, the commit push, and gh CLI operations. Pass a
+      GitHub App token or PAT so the created PR and pushes to an existing PR
+      can trigger downstream workflows; the default GITHUB_TOKEN cannot
+      (GitHub's recursion guard blocks workflows triggered by it, but does not
+      apply to App tokens or PATs).
   workload-identity-provider:
     description: >-
       Workload Identity Provider for Google Cloud authentication (Vertex AI).
@@ -194,6 +199,7 @@ runs:
       if: ${{ steps.guard.outputs.skip != 'true' && (steps.verify.outputs.verdict == 'pr' || steps.verify.outputs.verdict == 'draft-pr') }}
       shell: bash
       env:
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
         DIR: ${{ inputs.dir }}
         BRANCH_NAME: ${{ steps.branch.outputs.name }}
       run: '"$GITHUB_ACTION_PATH/scripts/commit-and-push.sh"'

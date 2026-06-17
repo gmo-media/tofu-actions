@@ -2,7 +2,7 @@
 # Commit and push the drift fix (also for unverified fixes, so they can be
 # handed off to a human as a draft PR).
 #
-# Env: DIR, BRANCH_NAME
+# Env: DIR, BRANCH_NAME, GH_TOKEN
 set -eo pipefail
 
 git config user.name "github-actions[bot]"
@@ -30,5 +30,20 @@ real-world infrastructure state.
 Automated by Claude Code drift fixer"
 
 git commit -m "$COMMIT_MSG"
+
+# actions/checkout (run inside configure@v5) persists the default GITHUB_TOKEN
+# as an http.extraheader, and that is the identity `git push` would otherwise
+# use. Events created by the default GITHUB_TOKEN cannot trigger downstream
+# workflows (GitHub's recursion guard), so re-point the credential to GH_TOKEN
+# (inputs.github-token): when that is an App token or PAT, the push — and the
+# resulting pull_request: synchronize event on an existing PR — can trigger
+# workflows. The extraheader takes precedence over credentials embedded in the
+# remote URL, so it must be replaced rather than supplemented. When GH_TOKEN is
+# the default token this is a harmless no-op (same identity).
+server="${GITHUB_SERVER_URL:-https://github.com}"
+git config --local --unset-all "http.${server}/.extraheader" || true
+auth_header="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+git config --local "http.${server}/.extraheader" "Authorization: Basic ${auth_header}"
+
 git push origin "$BRANCH_NAME"
 echo "Changes committed and pushed to branch $BRANCH_NAME"
