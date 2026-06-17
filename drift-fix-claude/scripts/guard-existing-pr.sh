@@ -29,6 +29,8 @@
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bot-identity.sh
+. "$SCRIPT_DIR/bot-identity.sh"
 
 # Auto-fix is optional: without the WIF pair the Claude step cannot
 # authenticate, and without anthropic-vertex-project-id it authenticates but
@@ -64,7 +66,7 @@ PR_INFO=$(gh pr view "$EXISTING_PR" --json commits,headRefName)
 
 # A human committed to the PR branch -> the PR is theirs now; never re-run
 # the fix on it (this is also the opt-out from repeated re-runs on drafts).
-HAS_HUMAN=$(printf '%s' "$PR_INFO" | jq -r -f "$SCRIPT_DIR/has-human-commits.jq")
+HAS_HUMAN=$(printf '%s' "$PR_INFO" | jq -r --arg bot_email "$BOT_EMAIL" -f "$SCRIPT_DIR/has-human-commits.jq")
 if [ "$HAS_HUMAN" = "true" ]; then
   {
     echo "skip=true"

@@ -5,8 +5,12 @@
 # Env: DIR, BRANCH_NAME, GH_TOKEN
 set -eo pipefail
 
-git config user.name "github-actions[bot]"
-git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bot-identity.sh
+. "$SCRIPT_DIR/bot-identity.sh"
+
+git config user.name "$BOT_NAME"
+git config user.email "$BOT_EMAIL"
 
 # git status --porcelain also catches newly created files,
 # unlike git diff (same detection as verify-drift-resolved.sh)
