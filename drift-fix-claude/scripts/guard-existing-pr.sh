@@ -17,8 +17,7 @@
 #   reflects the base branch, not this PR branch).
 #
 # The PR match logic lives in match-existing-pr.jq, the human-commit check
-# in has-human-commits.jq, and the plan execution in run-verify-plan.sh
-# (all shared with their unit tests under ../tests/).
+# in has-human-commits.jq, and the plan execution in run-verify-plan.sh.
 #
 # Env:    DIR, BASE_BRANCH, GH_TOKEN, TF_BINARY,
 #         WORKLOAD_IDENTITY_PROVIDER, SERVICE_ACCOUNT,
@@ -39,12 +38,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${GH_TOKEN:?GH_TOKEN is required}"
 : "${TF_BINARY:?TF_BINARY is required}"
 
-# Validate DIR before it can reach the Claude prompt. action.yaml expands
-# inputs.dir into the `/fix-drift <dir> ...` prompt by template substitution,
-# and the guard is the single gate every fix path flows through, so reject
-# shell/prompt metacharacters here. DIR is a repo-config matrix value (not
-# attacker-controlled), but this keeps the "dir is constrained" guarantee
-# explicit instead of relying on the prompt expansion being safe.
+# Validate DIR before it reaches the Claude prompt. action.yaml expands it
+# into the `/fix-drift <dir> ...` prompt by template substitution, and the
+# guard is the single gate every fix path flows through, so reject shell/prompt
+# metacharacters here rather than trusting that expansion to be safe.
 case "$DIR" in
   *[!A-Za-z0-9._/-]*)
     echo "Invalid dir '$DIR': only letters, digits and the characters . _ - / are allowed." >&2

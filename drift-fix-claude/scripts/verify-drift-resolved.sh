@@ -2,8 +2,7 @@
 # No-change gate: deterministically verify Claude's fix by re-running plan
 # and requiring "No changes". A remaining plan that would destroy and
 # recreate (-/+ or +/-) a resource is never handed off, even as a draft PR.
-# The verdict mapping lives in no-change-gate.sh (shared with
-# tests/no-change-gate.test.sh).
+# The verdict mapping lives in no-change-gate.sh.
 #
 # Env:    DIR, TF_BINARY, MODE, GH_TOKEN and EXISTING_PR_NUMBER
 #         (the last three only matter on the update + resolved path below)
@@ -60,15 +59,11 @@ case "$VERDICT" in
     ;;
   resolved)
     if [ "${MODE:-create}" = "update" ]; then
-      # Update mode means the guard saw fresh drift on the existing PR's
-      # branch, but the re-run produced no edits and plan now shows "No
-      # changes": the drift resolved between the guard's plan and this verify
-      # (transient, or fixed in the cloud console). The existing PR's branch
-      # still plans clean, so it remains a valid fix awaiting a human merge.
-      # Leave it open and point the notification at it -- do NOT report "no PR
-      # needed", which would contradict the still-open PR. (create-pr only
-      # runs for verdict pr/draft-pr, so without this the PR would be left
-      # untouched and the summary would be misleading.)
+      # Drift resolved between the guard's plan and this verify (transient, or
+      # fixed in the console): the existing PR's branch still plans clean and
+      # stays a valid fix awaiting merge. create-pr only runs for pr/draft-pr,
+      # so report the open PR here instead of "no PR needed" (which would
+      # contradict it).
       : "${EXISTING_PR_NUMBER:?EXISTING_PR_NUMBER is required when MODE=update}"
       gh pr comment "$EXISTING_PR_NUMBER" --body "🤖 New drift was detected in \`$DIR\` and the automated fix was re-run, but no further changes were needed — this PR's branch already plans clean. Leaving the PR open for review."
       PR_URL=$(gh pr view "$EXISTING_PR_NUMBER" --json url -q .url)

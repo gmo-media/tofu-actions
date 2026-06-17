@@ -5,7 +5,7 @@
 # the guard step in ../action.yaml: once a human has committed to the PR
 # branch (review fixes, manual work on a draft PR, "Update branch" merge
 # commits), ownership moves to the human and the bot must not re-run the
-# fix on that branch. Exercised directly by ../tests/has-human-commits.test.sh.
+# fix on that branch.
 #
 # The bot email is passed in via --arg bot_email from the single source of
 # truth in bot-identity.sh (the same value commit-and-push.sh stamps on the
