@@ -8,9 +8,11 @@
 # Env:   DIR, TF_BINARY
 # Exit:  the plan's exit code, passed through unmodified
 #        (0 = no changes, 2 = changes present, 1 = error)
-set -eo pipefail
+set -euo pipefail
 
 OUT_FILE="${1:?usage: run-verify-plan.sh OUT_FILE}"
+: "${DIR:?DIR is required}"
+: "${TF_BINARY:?TF_BINARY is required}"
 
 # tofu supports -concise to drop the refresh noise; terraform does not
 CONCISE_FLAG=""

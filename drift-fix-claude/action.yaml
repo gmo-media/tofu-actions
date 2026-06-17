@@ -173,6 +173,11 @@ runs:
       with:
         use_vertex: "true"
         github_token: ${{ inputs.github-token || github.token }}
+        # inputs.dir is expanded into the prompt by template substitution. It
+        # is safe to do so here because the guard validated it against a strict
+        # charset ([A-Za-z0-9._/-]) before this step runs, so it carries no
+        # shell/prompt metacharacters. tf-binary comes from read-config
+        # (tofu|terraform), not from caller-supplied free-form input.
         prompt: /fix-drift ${{ inputs.dir }} ${{ steps.config.outputs.tf-binary }} /tmp/plan.txt
         claude_args: >-
           --add-dir "${{ github.action_path }}/.."
@@ -189,8 +194,14 @@ runs:
       if: ${{ steps.guard.outputs.skip != 'true' }}
       shell: bash
       env:
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
         DIR: ${{ inputs.dir }}
         TF_BINARY: ${{ steps.config.outputs.tf-binary }}
+        # In update mode a verdict of `resolved` means the existing PR's branch
+        # already plans clean; verify points the notification at that PR rather
+        # than reporting "no PR needed". See scripts/verify-drift-resolved.sh.
+        MODE: ${{ steps.guard.outputs.mode }}
+        EXISTING_PR_NUMBER: ${{ steps.guard.outputs.existing-pr-number }}
       run: '"$GITHUB_ACTION_PATH/scripts/verify-drift-resolved.sh"'
 
     # Commit the changes (also for unverified fixes, so they can be handed

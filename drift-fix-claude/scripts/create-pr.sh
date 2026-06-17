@@ -9,7 +9,15 @@
 #         MODE, EXISTING_PR_NUMBER (only when MODE=update)
 # Reads:  /tmp/verify-plan.txt (written by verify-drift-resolved.sh)
 # Writes: pr-url / summary to GITHUB_OUTPUT
-set -eo pipefail
+set -euo pipefail
+
+: "${DIR:?DIR is required}"
+: "${TF_BINARY:?TF_BINARY is required}"
+: "${BASE_BRANCH:?BASE_BRANCH is required}"
+: "${BRANCH_NAME:?BRANCH_NAME is required}"
+: "${VERDICT:?VERDICT is required}"
+: "${MODE:?MODE is required}"
+: "${GH_TOKEN:?GH_TOKEN is required}"
 
 # Check if changes were pushed. In update mode the PR branch always exists
 # on origin, so this never triggers there; pushes are guaranteed by the
@@ -36,8 +44,12 @@ if [ "$VERDICT" = "draft-pr" ]; then
     echo
     # Indented code block: unlike a ``` fence, plan output that
     # itself contains backticks cannot break out and render as
-    # markdown.
-    head -c 40000 /tmp/verify-plan.txt | sed 's/^/    /'
+    # markdown -- but only while EVERY emitted line stays indented.
+    # head -c cuts on a byte boundary, so it can leave a final partial
+    # line with no trailing newline; awk treats that fragment as a
+    # record and print appends a newline, so the last line is still
+    # indented and terminated (sed would leave it unterminated).
+    head -c 40000 /tmp/verify-plan.txt | awk '{ print "    " $0 }'
     echo
     echo
   } >> "$BODY_FILE"

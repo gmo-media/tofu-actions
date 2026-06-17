@@ -3,11 +3,17 @@
 # handed off to a human as a draft PR).
 #
 # Env: DIR, BRANCH_NAME, GH_TOKEN
-set -eo pipefail
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bot-identity.sh
 . "$SCRIPT_DIR/bot-identity.sh"
+
+# Required inputs: under set -u an unset BRANCH_NAME would otherwise turn the
+# final `git push origin "$BRANCH_NAME"` into a bare `git push origin`.
+: "${DIR:?DIR is required}"
+: "${BRANCH_NAME:?BRANCH_NAME is required}"
+: "${GH_TOKEN:?GH_TOKEN is required}"
 
 git config user.name "$BOT_NAME"
 git config user.email "$BOT_EMAIL"

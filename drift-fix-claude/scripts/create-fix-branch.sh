@@ -5,7 +5,9 @@
 #
 # Env:    DIR, MODE, EXISTING_BRANCH (only when MODE=update)
 # Writes: name to GITHUB_OUTPUT
-set -eo pipefail
+set -euo pipefail
+
+: "${MODE:?MODE is required}"
 
 if [ "$MODE" = "update" ]; then
   echo "name=${EXISTING_BRANCH:?EXISTING_BRANCH is required when MODE=update}" >> "$GITHUB_OUTPUT"
@@ -15,6 +17,7 @@ fi
 # COUPLING (keep in sync): this branch name is matched by the guard via
 # match-existing-pr.jq. Changing the format here requires updating that
 # filter (and its tests) accordingly.
+: "${DIR:?DIR is required when MODE=create}"
 BRANCH_NAME="fix-drift-$(echo "$DIR" | tr '/' '-')-$(date +%Y%m%d-%H%M%S)"
 git checkout -b "$BRANCH_NAME"
 echo "name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"

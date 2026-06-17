@@ -26,11 +26,31 @@
 # Writes: skip / mode / branch / existing-pr-number / summary to GITHUB_OUTPUT,
 #         summary line to GITHUB_STEP_SUMMARY, on mode=update the fresh
 #         plan output to /tmp/plan.txt
-set -eo pipefail
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bot-identity.sh
 . "$SCRIPT_DIR/bot-identity.sh"
+
+# Required inputs: fail loudly rather than emit broken output (e.g. a summary
+# with an empty `dir`) when a caller wires the step up wrong.
+: "${DIR:?DIR is required}"
+: "${BASE_BRANCH:?BASE_BRANCH is required}"
+: "${GH_TOKEN:?GH_TOKEN is required}"
+: "${TF_BINARY:?TF_BINARY is required}"
+
+# Validate DIR before it can reach the Claude prompt. action.yaml expands
+# inputs.dir into the `/fix-drift <dir> ...` prompt by template substitution,
+# and the guard is the single gate every fix path flows through, so reject
+# shell/prompt metacharacters here. DIR is a repo-config matrix value (not
+# attacker-controlled), but this keeps the "dir is constrained" guarantee
+# explicit instead of relying on the prompt expansion being safe.
+case "$DIR" in
+  *[!A-Za-z0-9._/-]*)
+    echo "Invalid dir '$DIR': only letters, digits and the characters . _ - / are allowed." >&2
+    exit 1
+    ;;
+esac
 
 # Auto-fix is optional: without the WIF pair the Claude step cannot
 # authenticate, and without anthropic-vertex-project-id it authenticates but
