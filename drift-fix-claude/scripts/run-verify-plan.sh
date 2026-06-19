@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Run `<tf-binary> plan` for drift verification and capture its output.
-# Used by verify-drift-resolved.sh (no-change gate).
-# TODO: share with guard-existing-pr.sh stale-PR detection to keep plan
-# flags identical between the two checks.
+# Shared by guard-existing-pr.sh (stale-PR detection) and
+# verify-drift-resolved.sh (no-change gate) so both use identical plan
+# conditions.
 #
 # Usage: run-verify-plan.sh OUT_FILE
 # Env:   DIR, TF_BINARY

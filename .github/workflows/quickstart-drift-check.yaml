@@ -60,7 +60,6 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - uses: gmo-media/tofu-actions/configure@v5
         with:
           dir: ${{ matrix.dir }}
@@ -80,7 +79,6 @@ jobs:
             echo "do-notify=false" >> $GITHUB_OUTPUT
           fi
 
-      # Always invoke the fix when drift exists; the action owns the gate
       # decision (it self-skips when auto-fix is not configured).
       - if: ${{ steps.plan.outputs.has-diff == 'true' }}
         id: fix
