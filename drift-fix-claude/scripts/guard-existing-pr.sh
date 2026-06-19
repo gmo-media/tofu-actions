@@ -79,6 +79,13 @@ if [ -z "$EXISTING_PR" ]; then
   exit 0
 fi
 
+# Guard against unexpected jq output before using EXISTING_PR in gh commands.
+case "$EXISTING_PR" in
+  *[!0-9]*)
+    echo "Unexpected PR identifier from match-existing-pr.jq: '$EXISTING_PR'" >&2
+    exit 1 ;;
+esac
+
 PR_INFO=$(gh pr view "$EXISTING_PR" --json commits,headRefName)
 
 # A human committed to the PR branch -> the PR is theirs now; never re-run
@@ -104,6 +111,12 @@ if [ "$ORIGINAL_REF" = "HEAD" ]; then
 fi
 git fetch origin "$EXISTING_BRANCH"
 git checkout -B "$EXISTING_BRANCH" FETCH_HEAD
+# Restore the original checkout on any exit (including errors). This ensures
+# caller steps that run after this action (if: always() or continue-on-error)
+# do not observe the PR branch as HEAD. Disabled in the mode=update path below
+# because downstream steps need the PR branch checked out.
+_restore_head() { git checkout "$ORIGINAL_REF" || true; }
+trap '_restore_head' EXIT
 
 # configure@v5 ran init against the base branch only. The PR branch (an
 # earlier Claude fix) may have added a module, changed required_providers, or
@@ -130,9 +143,6 @@ set -e
 
 case "$PLAN_EXIT_CODE" in
   0)
-    # Restore the original checkout so caller steps after this action do
-    # not see an unexpected HEAD.
-    git checkout "$ORIGINAL_REF"
     {
       echo "skip=true"
       echo "existing-pr-number=$EXISTING_PR"
@@ -141,6 +151,7 @@ case "$PLAN_EXIT_CODE" in
     echo "Skipped drift fix for \`$DIR\`: open PR #$EXISTING_PR still resolves the drift." >> "$GITHUB_STEP_SUMMARY"
     ;;
   2)
+    trap - EXIT  # intentionally leave the PR branch checked out for downstream steps
     cp /tmp/guard-plan.txt /tmp/plan.txt
     {
       echo "skip=false"
