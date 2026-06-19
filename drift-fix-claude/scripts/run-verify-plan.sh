@@ -25,4 +25,6 @@ set +e
 # 2>&1: plan errors go to stderr; capture them so the fail branch and
 # the draft PR body are not empty on exit code 1.
 (cd "$DIR" && "$TF_BINARY" plan -no-color -lock-timeout=300s $CONCISE_FLAG -detailed-exitcode) > "$OUT_FILE" 2>&1
-exit $?
+PLAN_EXIT=$?
+set -e
+exit $PLAN_EXIT
