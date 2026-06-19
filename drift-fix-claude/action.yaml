@@ -128,7 +128,7 @@ runs:
     # abort the action; the commit step below will push whatever was edited.
     - name: Fix drift with Claude Code
       if: ${{ steps.guard.outputs.skip != 'true' }}
-      uses: anthropics/claude-code-action@15b5879e769f1b8e7f7fddda7358a557995e9841 # v1.0.144
+      uses: anthropics/claude-code-action@0f97b95b6536c26e5f6bd90faec370d41695beca # v1.0.144
       continue-on-error: true
       env:
         GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.vertex-auth.outputs.credentials_file_path }}
