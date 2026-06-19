@@ -78,6 +78,7 @@ jobs:
           else
             echo "do-notify=false" >> $GITHUB_OUTPUT
           fi
+
       # Always invoke the fix when drift exists; the action owns the gate
       # decision (it self-skips when auto-fix is not configured, when an open
       # drift-fix PR already resolves the drift, or when that PR has human

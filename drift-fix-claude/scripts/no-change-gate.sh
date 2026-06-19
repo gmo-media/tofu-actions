@@ -20,6 +20,7 @@
 #                  an unexpected exit code, or inconsistent inputs)
 #
 # Pure mapping with no side effects; exits non-zero only on invalid usage.
+# Logic: branch on plan exit code first, then check secondary conditions.
 set -euo pipefail
 
 if [ "$#" -ne 3 ]; then
@@ -41,7 +42,6 @@ for flag in "HAS_DIFF=$HAS_DIFF" "HAS_REPLACE=$HAS_REPLACE"; do
   esac
 done
 
-# Logic: branch on plan exit code first, then check secondary conditions.
 case "$PLAN_EXIT_CODE" in
   0)
     if [ "$HAS_DIFF" = "true" ]; then echo "pr"; else echo "resolved"; fi

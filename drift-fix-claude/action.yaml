@@ -111,8 +111,8 @@ runs:
     # Authenticate to Google Cloud for Vertex AI. The credentials are NOT
     # exported as job-wide env vars: configure@v5 already set up ADC for
     # Terraform/OpenTofu, and overwriting GOOGLE_APPLICATION_CREDENTIALS here
-    # would break the guard/verify plan runs that follow. The credentials
-    # file is passed to the Claude step alone via its step env below.
+    # would break any plan runs that follow. The credentials file is passed
+    # to the Claude step alone via its step env below.
     - name: Authenticate to Google Cloud
       if: ${{ steps.guard.outputs.skip != 'true' }}
       id: vertex-auth
