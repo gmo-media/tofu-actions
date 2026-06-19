@@ -6,9 +6,8 @@
 # later cron runs from re-running Claude while the PR stays valid.
 #
 # Env:    GH_TOKEN, DIR, TF_BINARY, BASE_BRANCH, BRANCH_NAME, VERDICT,
-#         MODE, EXISTING_PR_NUMBER (only when MODE=update),
-#         VERIFY_PLAN_TXT (set by verify-drift-resolved.sh via GITHUB_ENV)
-# Reads:  "$VERIFY_PLAN_TXT" (written by verify-drift-resolved.sh)
+#         MODE, EXISTING_PR_NUMBER (only when MODE=update)
+# Reads:  /tmp/verify-plan.txt (written by verify-drift-resolved.sh)
 # Writes: pr-url / summary to GITHUB_OUTPUT
 set -euo pipefail
 
@@ -19,7 +18,6 @@ set -euo pipefail
 : "${VERDICT:?VERDICT is required}"
 : "${MODE:?MODE is required}"
 : "${GH_TOKEN:?GH_TOKEN is required}"
-: "${VERIFY_PLAN_TXT:?VERIFY_PLAN_TXT is required (set by verify-drift-resolved.sh via GITHUB_ENV)}"
 
 # Check if changes were pushed. In update mode the PR branch always exists
 # on origin, so this never triggers there; pushes are guaranteed by the
@@ -51,7 +49,7 @@ if [ "$VERDICT" = "draft-pr" ]; then
     # line with no trailing newline; awk treats that fragment as a
     # record and print appends a newline, so the last line is still
     # indented and terminated (sed would leave it unterminated).
-    head -c 40000 "$VERIFY_PLAN_TXT" | awk '{ print "    " $0 }'
+    head -c 40000 /tmp/verify-plan.txt | awk '{ print "    " $0 }'
     echo
     echo
   } >> "$BODY_FILE"

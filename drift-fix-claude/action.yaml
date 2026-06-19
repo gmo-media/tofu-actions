@@ -39,16 +39,19 @@ inputs:
 
 outputs:
   pr-url:
-    description: URL of the created pull request (empty when skipped)
+    description: URL of the created or updated pull request (empty when skipped)
     value: ${{ steps.create-pr.outputs.pr-url }}
   branch-name:
-    description: Name of the branch with fixes (empty when skipped)
+    description: Name of the branch with fixes (the existing PR's branch when it was updated; empty when skipped)
     value: ${{ steps.branch.outputs.name }}
   skipped:
-    description: "true if the fix was skipped: auto-fix is not configured (missing Vertex AI inputs)"
+    description: "true if the fix was skipped: auto-fix is not configured (missing Vertex AI inputs), or an open drift-fix PR already resolves the drift (or a human has committed to it)"
     value: ${{ steps.guard.outputs.skip }}
+  existing-pr-number:
+    description: Number of the existing open drift-fix PR when skipped or updated (otherwise empty)
+    value: ${{ steps.guard.outputs.existing-pr-number }}
   fix-verified:
-    description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created unverified, empty when no PR was created"
+    description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created or updated unverified, empty when no PR was created"
     value: ${{ steps.verify.outputs.fix-verified }}
   summary:
     description: One-line outcome for notification (skip reason or PR URL). Empty on hard failure.
@@ -57,25 +60,34 @@ outputs:
 runs:
   using: composite
   steps:
+    # read-config runs before the guard because the guard needs tf-binary
+    # to re-run plan on an existing PR's branch for the stale check.
     - id: config
       uses: gmo-media/tofu-actions/read-config@v5
       with:
         config: ${{ inputs.config }}
         dir: ${{ inputs.dir }}
 
-    # Skip when auto-fix is not configured (missing Vertex AI inputs).
-    # See scripts/guard-existing-pr.sh.
+    # Decide skip / create / update before the costly Claude run. Skips when
+    # auto-fix is not configured (missing Vertex AI inputs), or when an open
+    # drift-fix PR still resolves the drift (or a human committed to it);
+    # hands off mode=update when the PR went stale because new drift
+    # appeared after it was created. See scripts/guard-existing-pr.sh.
     - name: Check existing drift-fix PR (skip / create / update)
       id: guard
       shell: bash
       env:
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
         DIR: ${{ inputs.dir }}
+        BASE_BRANCH: ${{ inputs.base-branch }}
+        TF_BINARY: ${{ steps.config.outputs.tf-binary }}
         WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload-identity-provider }}
         SERVICE_ACCOUNT: ${{ inputs.service-account }}
         ANTHROPIC_VERTEX_PROJECT_ID: ${{ inputs.anthropic-vertex-project-id }}
       run: '"$GITHUB_ACTION_PATH/scripts/guard-existing-pr.sh"'
 
-    # Create a new branch for the fix. See scripts/create-fix-branch.sh.
+    # Create a new branch for the fix, or reuse the existing PR branch in
+    # update mode. See scripts/create-fix-branch.sh.
     - name: Create fix branch
       if: ${{ steps.guard.outputs.skip != 'true' }}
       id: branch
@@ -83,11 +95,14 @@ runs:
       env:
         DIR: ${{ inputs.dir }}
         MODE: ${{ steps.guard.outputs.mode }}
-        EXISTING_BRANCH: ""
+        EXISTING_BRANCH: ${{ steps.guard.outputs.branch }}
       run: '"$GITHUB_ACTION_PATH/scripts/create-fix-branch.sh"'
 
+    # In update mode the guard already wrote the PR branch's fresh plan to
+    # /tmp/plan.txt; the `plan` input reflects the base branch and would be
+    # wrong for the re-run.
     - name: Save plan to file
-      if: ${{ steps.guard.outputs.skip != 'true' }}
+      if: ${{ steps.guard.outputs.skip != 'true' && steps.guard.outputs.mode == 'create' }}
       shell: bash
       env:
         PLAN: ${{ inputs.plan }}
@@ -96,8 +111,8 @@ runs:
     # Authenticate to Google Cloud for Vertex AI. The credentials are NOT
     # exported as job-wide env vars: configure@v5 already set up ADC for
     # Terraform/OpenTofu, and overwriting GOOGLE_APPLICATION_CREDENTIALS here
-    # would break any plan runs that follow. The credentials file is passed
-    # to the Claude step alone via its step env below.
+    # would break the guard/verify plan runs that follow. The credentials
+    # file is passed to the Claude step alone via its step env below.
     - name: Authenticate to Google Cloud
       if: ${{ steps.guard.outputs.skip != 'true' }}
       id: vertex-auth
@@ -129,7 +144,11 @@ runs:
     # continue-on-error: a mid-run Claude failure (API error, credential
     # expiry, max-turns) may still leave useful partial edits. Do NOT let it
     # abort the action; the no-change gate below re-runs plan and decides the
-    # fate of whatever was edited.
+    # fate of whatever was edited: a clean plan becomes a verified PR, a
+    # remaining plan a draft PR for a human to finish, and a destructive
+    # (-/+) or empty result still fails. Removing this discards partial work
+    # and reds the job before verify can run (regression seen when migrating
+    # off claude-code-base-action, which had this set).
     - name: Fix drift with Claude Code
       if: ${{ steps.guard.outputs.skip != 'true' }}
       uses: anthropics/claude-code-action@0cb4f3e5e764d2e00407d29b6bf0aa9df0976d88 # v1.0.146
@@ -165,6 +184,9 @@ runs:
         GH_TOKEN: ${{ inputs.github-token || github.token }}
         DIR: ${{ inputs.dir }}
         TF_BINARY: ${{ steps.config.outputs.tf-binary }}
+        # In update mode a verdict of `resolved` means the existing PR's branch
+        # already plans clean; verify points the notification at that PR rather
+        # than reporting "no PR needed". See scripts/verify-drift-resolved.sh.
         MODE: ${{ steps.guard.outputs.mode }}
         EXISTING_PR_NUMBER: ${{ steps.guard.outputs.existing-pr-number }}
       run: '"$GITHUB_ACTION_PATH/scripts/verify-drift-resolved.sh"'
@@ -180,9 +202,10 @@ runs:
         BRANCH_NAME: ${{ steps.branch.outputs.name }}
       run: '"$GITHUB_ACTION_PATH/scripts/commit-and-push.sh"'
 
-    # Create a pull request if changes were made. Unverified fixes
-    # (verdict=draft-pr) become a draft PR so a human can finish the fix.
-    # See scripts/create-pr.sh.
+    # Create a pull request if changes were made, or update the existing one
+    # in update mode (title/body/draft state synced to the verdict plus a
+    # notification comment). Unverified fixes (verdict=draft-pr) become a
+    # draft PR so a human can finish the fix. See scripts/create-pr.sh.
     - name: Create or update Pull Request
       if: ${{ steps.guard.outputs.skip != 'true' && (steps.verify.outputs.verdict == 'pr' || steps.verify.outputs.verdict == 'draft-pr') }}
       id: create-pr

@@ -8,19 +8,13 @@
 #         (the last three only matter on the update + resolved path below)
 # Writes: verdict / fix-verified / summary (resolved only) to GITHUB_OUTPUT,
 #         summary to GITHUB_STEP_SUMMARY, plan output (stdout+stderr) to
-#         VERIFY_PLAN_TXT (reused by create-pr.sh for the draft PR body)
+#         /tmp/verify-plan.txt (reused by create-pr.sh for the draft PR body)
 set -euo pipefail
 
 : "${DIR:?DIR is required}"
 : "${TF_BINARY:?TF_BINARY is required}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Derive a per-DIR filename so concurrent matrix jobs don't clobber each other.
-PLAN_SLUG="$(echo "$DIR" | tr '/' '-' | tr -dc 'a-zA-Z0-9._-' | sed 's/^[-.]*//')"
-VERIFY_PLAN_TXT="${RUNNER_TEMP:-/tmp}/verify-plan-${PLAN_SLUG}.txt"
-# Export for create-pr.sh (runs as a subsequent step in the same job).
-echo "VERIFY_PLAN_TXT=$VERIFY_PLAN_TXT" >> "$GITHUB_ENV"
 
 # git status --porcelain also catches newly created .tf files,
 # unlike git diff (assumes init artifacts like .terraform/ are
@@ -31,15 +25,17 @@ else
   HAS_DIFF=false
 fi
 
+# Plan execution (flags, output capture) is shared with the guard's
+# stale-PR detection; see scripts/run-verify-plan.sh.
 set +e
-"$SCRIPT_DIR/run-verify-plan.sh" "$VERIFY_PLAN_TXT"
+"$SCRIPT_DIR/run-verify-plan.sh" /tmp/verify-plan.txt
 PLAN_EXIT_CODE=$?
 set -e
 
 # Replacement detection: "# <addr> must be replaced" header comments and
 # -/+ / +/- resource action lines. Create-only or destroy-only changes do
 # not match; only a destroy-and-recreate of the same resource does.
-if grep -qE '^[[:space:]]*(# .* must be replaced$|[-+]/[-+] resource )' "$VERIFY_PLAN_TXT"; then
+if grep -qE '^[[:space:]]*(# .* must be replaced$|[-+]/[-+] resource )' /tmp/verify-plan.txt; then
   HAS_REPLACE=true
 else
   HAS_REPLACE=false
@@ -48,7 +44,7 @@ fi
 VERDICT=$("$SCRIPT_DIR/no-change-gate.sh" "$PLAN_EXIT_CODE" "$HAS_DIFF" "$HAS_REPLACE")
 {
   echo "verdict=$VERDICT"
-  if [ "$VERDICT" = "pr" ] || [ "$VERDICT" = "resolved" ]; then
+  if [ "$VERDICT" = "pr" ]; then
     echo "fix-verified=true"
   elif [ "$VERDICT" = "draft-pr" ]; then
     echo "fix-verified=false"
@@ -85,7 +81,7 @@ case "$VERDICT" in
       # Indented code block: unlike a ``` fence, plan output that
       # itself contains backticks cannot break out and render as
       # markdown.
-      sed 's/^/    /' "$VERIFY_PLAN_TXT"
+      sed 's/^/    /' /tmp/verify-plan.txt
     } >> "$GITHUB_STEP_SUMMARY"
     ;;
   replace-fail)
@@ -95,10 +91,10 @@ case "$VERDICT" in
       # Indented code block: unlike a ``` fence, plan output that
       # itself contains backticks cannot break out and render as
       # markdown.
-      sed 's/^/    /' "$VERIFY_PLAN_TXT"
+      sed 's/^/    /' /tmp/verify-plan.txt
     } >> "$GITHUB_STEP_SUMMARY"
     echo "Plan would replace resources in \`$DIR\`; refusing to create a PR."
-    cat "$VERIFY_PLAN_TXT"
+    cat /tmp/verify-plan.txt
     exit 1
     ;;
   *)
@@ -107,7 +103,7 @@ case "$VERDICT" in
     else
       echo "Verification plan failed in \`$DIR\` (exit code $PLAN_EXIT_CODE)." | tee -a "$GITHUB_STEP_SUMMARY"
     fi
-    cat "$VERIFY_PLAN_TXT"
+    cat /tmp/verify-plan.txt
     exit 1
     ;;
 esac

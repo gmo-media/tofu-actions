@@ -60,7 +60,6 @@ jobs:
         include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - uses: gmo-media/tofu-actions/configure@v5
         with:
           dir: ${{ matrix.dir }}
@@ -79,9 +78,10 @@ jobs:
           else
             echo "do-notify=false" >> $GITHUB_OUTPUT
           fi
-
       # Always invoke the fix when drift exists; the action owns the gate
-      # decision (it self-skips when auto-fix is not configured).
+      # decision (it self-skips when auto-fix is not configured, when an open
+      # drift-fix PR already resolves the drift, or when that PR has human
+      # commits).
       - if: ${{ steps.plan.outputs.has-diff == 'true' }}
         id: fix
         uses: gmo-media/tofu-actions/drift-fix-claude@v5
@@ -105,14 +105,15 @@ jobs:
           additional-message: ${{ steps.fix.outputs.summary || 'Please review the changes and fix manually.' }}
           webhook: ${{ secrets.drift-notify-webhook }}
 
-      # The automatic fix hard-failed (e.g. Claude errored). Notify with the
-      # original drift plan so a human can take over.
+      # The automatic fix hard-failed (e.g. the plan would replace resources,
+      # or Claude errored). Notify with the original drift plan so a human can
+      # take over; the detailed failure reason is in the job summary.
       - if: ${{ !cancelled() && steps.plan.outputs.has-diff == 'true' && steps.check-webhook.outputs.do-notify == 'true' && steps.fix.outcome == 'failure' }}
         uses: gmo-media/tofu-actions/notify-drift@v5
         with:
           dir: ${{ matrix.dir }}
           plan: ${{ steps.plan.outputs.plan }}
-          additional-message: "The automatic drift fix failed; manual action is needed. See the workflow logs for details."
+          additional-message: "⚠️ The automatic drift fix failed; manual action is needed. See the workflow logs for details."
           webhook: ${{ secrets.drift-notify-webhook }}
 
       # Simply fail to notify the user if no webhook is given
