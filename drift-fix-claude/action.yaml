@@ -47,9 +47,12 @@ outputs:
   skipped:
     description: "true if the fix was skipped: auto-fix is not configured (missing Vertex AI inputs)"
     value: ${{ steps.guard.outputs.skip }}
+  fix-verified:
+    description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created unverified, empty when no PR was created"
+    value: ${{ steps.verify.outputs.fix-verified }}
   summary:
     description: One-line outcome for notification (skip reason or PR URL). Empty on hard failure.
-    value: ${{ steps.guard.outputs.summary || steps.create-pr.outputs.summary }}
+    value: ${{ steps.guard.outputs.summary || steps.create-pr.outputs.summary || steps.verify.outputs.summary }}
 
 runs:
   using: composite
@@ -125,7 +128,8 @@ runs:
     # that predates skill auto-loading from --add-dir directories (2.1.32).
     # continue-on-error: a mid-run Claude failure (API error, credential
     # expiry, max-turns) may still leave useful partial edits. Do NOT let it
-    # abort the action; the commit step below will push whatever was edited.
+    # abort the action; the no-change gate below re-runs plan and decides the
+    # fate of whatever was edited.
     - name: Fix drift with Claude Code
       if: ${{ steps.guard.outputs.skip != 'true' }}
       uses: anthropics/claude-code-action@0cb4f3e5e764d2e00407d29b6bf0aa9df0976d88 # v1.0.146
@@ -148,9 +152,27 @@ runs:
           --allowedTools "Bash,Edit,Glob,Grep,LS,MultiEdit,Read,Task,TodoWrite,WebFetch,WebSearch,Write"
           --disallowedTools "Bash(${{ steps.config.outputs.tf-binary }} apply:*),Bash(git commit:*),Bash(git push:*)"
 
-    # Commit the changes. See scripts/commit-and-push.sh.
-    - name: Commit changes
+    # No-change gate: deterministically verify Claude's fix by re-running
+    # plan and requiring "No changes". A remaining plan that would destroy
+    # and recreate (-/+) a resource is never handed off, even as a draft PR.
+    # See scripts/verify-drift-resolved.sh; the verdict mapping lives in
+    # scripts/no-change-gate.sh.
+    - name: Verify drift is resolved (no-change gate)
+      id: verify
       if: ${{ steps.guard.outputs.skip != 'true' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
+        DIR: ${{ inputs.dir }}
+        TF_BINARY: ${{ steps.config.outputs.tf-binary }}
+        MODE: ${{ steps.guard.outputs.mode }}
+        EXISTING_PR_NUMBER: ${{ steps.guard.outputs.existing-pr-number }}
+      run: '"$GITHUB_ACTION_PATH/scripts/verify-drift-resolved.sh"'
+
+    # Commit the changes (also for unverified fixes, so they can be handed
+    # off to a human as a draft PR). See scripts/commit-and-push.sh.
+    - name: Commit changes
+      if: ${{ steps.guard.outputs.skip != 'true' && (steps.verify.outputs.verdict == 'pr' || steps.verify.outputs.verdict == 'draft-pr') }}
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token || github.token }}
@@ -158,10 +180,11 @@ runs:
         BRANCH_NAME: ${{ steps.branch.outputs.name }}
       run: '"$GITHUB_ACTION_PATH/scripts/commit-and-push.sh"'
 
-    # Create a pull request if changes were committed.
+    # Create a pull request if changes were made. Unverified fixes
+    # (verdict=draft-pr) become a draft PR so a human can finish the fix.
     # See scripts/create-pr.sh.
     - name: Create or update Pull Request
-      if: ${{ steps.guard.outputs.skip != 'true' }}
+      if: ${{ steps.guard.outputs.skip != 'true' && (steps.verify.outputs.verdict == 'pr' || steps.verify.outputs.verdict == 'draft-pr') }}
       id: create-pr
       shell: bash
       env:
@@ -170,7 +193,7 @@ runs:
         TF_BINARY: ${{ steps.config.outputs.tf-binary }}
         BASE_BRANCH: ${{ inputs.base-branch }}
         BRANCH_NAME: ${{ steps.branch.outputs.name }}
-        VERDICT: pr
+        VERDICT: ${{ steps.verify.outputs.verdict }}
         MODE: ${{ steps.guard.outputs.mode }}
-        EXISTING_PR_NUMBER: ""
+        EXISTING_PR_NUMBER: ${{ steps.guard.outputs.existing-pr-number }}
       run: '"$GITHUB_ACTION_PATH/scripts/create-pr.sh"'
