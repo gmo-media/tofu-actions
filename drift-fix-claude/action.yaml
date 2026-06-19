@@ -166,7 +166,7 @@ runs:
         DIR: ${{ inputs.dir }}
         TF_BINARY: ${{ steps.config.outputs.tf-binary }}
         MODE: ${{ steps.guard.outputs.mode }}
-        EXISTING_PR_NUMBER: ""
+        EXISTING_PR_NUMBER: ${{ steps.guard.outputs.existing-pr-number }}
       run: '"$GITHUB_ACTION_PATH/scripts/verify-drift-resolved.sh"'
 
     # Commit the changes (also for unverified fixes, so they can be handed
@@ -195,5 +195,5 @@ runs:
         BRANCH_NAME: ${{ steps.branch.outputs.name }}
         VERDICT: ${{ steps.verify.outputs.verdict }}
         MODE: ${{ steps.guard.outputs.mode }}
-        EXISTING_PR_NUMBER: ""
+        EXISTING_PR_NUMBER: ${{ steps.guard.outputs.existing-pr-number }}
       run: '"$GITHUB_ACTION_PATH/scripts/create-pr.sh"'
