@@ -41,12 +41,16 @@ for flag in "HAS_DIFF=$HAS_DIFF" "HAS_REPLACE=$HAS_REPLACE"; do
   esac
 done
 
-# "No changes" output (exit 0) cannot contain a replacement; that
-# combination means the inputs are inconsistent -> fall through to fail.
-case "$PLAN_EXIT_CODE:$HAS_DIFF:$HAS_REPLACE" in
-  0:true:false)  echo "pr" ;;
-  0:false:false) echo "resolved" ;;
-  2:true:true)   echo "replace-fail" ;;
-  2:true:false)  echo "draft-pr" ;;
-  *)             echo "fail" ;;
+# Logic: branch on plan exit code first, then check secondary conditions.
+case "$PLAN_EXIT_CODE" in
+  0)
+    if [ "$HAS_DIFF" = "true" ]; then echo "pr"; else echo "resolved"; fi
+    ;;
+  2)
+    if   [ "$HAS_REPLACE" = "true" ]; then echo "replace-fail"
+    elif [ "$HAS_DIFF"    = "true" ]; then echo "draft-pr"
+    else echo "fail"
+    fi
+    ;;
+  *) echo "fail" ;;
 esac
