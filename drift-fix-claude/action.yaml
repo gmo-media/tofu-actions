@@ -14,28 +14,20 @@ inputs:
 
   github-token:
     description: >-
-      Token for PR creation, the commit push, and gh CLI operations. Pass a
-      GitHub App token or PAT so the created PR and pushes to an existing PR
-      can trigger downstream workflows; the default GITHUB_TOKEN cannot
-      (GitHub's recursion guard blocks workflows triggered by it, but does not
-      apply to App tokens or PATs).
+      GitHub App token or PAT for PR creation and push. The default
+      GITHUB_TOKEN cannot trigger downstream workflows.
   workload-identity-provider:
     description: >-
-      Workload Identity Provider for Google Cloud authentication (Vertex AI).
-      Automatic drift fix requires this, service-account and
-      anthropic-vertex-project-id; when any is omitted the action skips
-      without attempting a fix.
+      Workload Identity Provider for Vertex AI auth. All three Vertex AI
+      inputs must be set; when any is omitted the action skips.
   service-account:
     description: >-
-      Service account email for Google Cloud authentication (Vertex AI).
-      Automatic drift fix requires this, workload-identity-provider and
-      anthropic-vertex-project-id; when any is omitted the action skips
-      without attempting a fix.
+      Service account email for Vertex AI auth. All three Vertex AI inputs
+      must be set; when any is omitted the action skips.
   anthropic-vertex-project-id:
     description: >-
-      Anthropic Vertex AI project ID. Required for automatic drift fix
-      alongside workload-identity-provider and service-account; when any is
-      omitted the action skips without attempting a fix.
+      Anthropic Vertex AI project ID. All three Vertex AI inputs must be
+      set; when any is omitted the action skips.
   cloud-ml-region:
     description: Cloud ML region for Vertex AI
   anthropic-model:
@@ -62,10 +54,7 @@ outputs:
     description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created or updated unverified, empty when no PR was created"
     value: ${{ steps.verify.outputs.fix-verified }}
   summary:
-    description: >-
-      One-line human-readable outcome for notification: the skip reason, or
-      the PR result with its URL. Empty when the action hard-fails (the
-      caller should derive a failure message itself).
+    description: One-line outcome for notification (skip reason or PR URL). Empty on hard failure.
     value: ${{ steps.guard.outputs.summary || steps.create-pr.outputs.summary || steps.verify.outputs.summary }}
 
 runs:
