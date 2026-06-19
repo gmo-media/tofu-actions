@@ -39,19 +39,19 @@ inputs:
 
 outputs:
   pr-url:
-    description: URL of the created or updated pull request (empty when skipped)
+    description: URL of the created pull request (empty when skipped)
     value: ${{ steps.create-pr.outputs.pr-url }}
   branch-name:
-    description: Name of the branch with fixes (the existing PR's branch when it was updated; empty when skipped)
+    description: Name of the branch with fixes (empty when skipped)
     value: ${{ steps.branch.outputs.name }}
   skipped:
-    description: "true if the fix was skipped: auto-fix is not configured (missing Vertex AI inputs), or an open drift-fix PR already resolves the drift (or a human has committed to it)"
+    description: "true if the fix was skipped: auto-fix is not configured (missing Vertex AI inputs)"
     value: ${{ steps.guard.outputs.skip }}
   existing-pr-number:
     description: Number of the existing open drift-fix PR when skipped or updated (otherwise empty)
     value: ${{ steps.guard.outputs.existing-pr-number }}
   fix-verified:
-    description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created or updated unverified, empty when no PR was created"
+    description: "'true' if the fix was verified (plan shows no changes), 'false' if a draft PR was created unverified, empty when no PR was created"
     value: ${{ steps.verify.outputs.fix-verified }}
   summary:
     description: One-line outcome for notification (skip reason or PR URL). Empty on hard failure.
