@@ -31,8 +31,6 @@ else
   HAS_DIFF=false
 fi
 
-# Plan execution (flags, output capture) is shared with the guard's
-# stale-PR detection; see scripts/run-verify-plan.sh.
 set +e
 "$SCRIPT_DIR/run-verify-plan.sh" "$VERIFY_PLAN_TXT"
 PLAN_EXIT_CODE=$?
