@@ -9,6 +9,7 @@
 #         MODE, EXISTING_PR_NUMBER (only when MODE=update),
 #         VERIFY_PLAN_TXT (set by verify-drift-resolved.sh via GITHUB_ENV)
 # Reads:  "$VERIFY_PLAN_TXT" (written by verify-drift-resolved.sh)
+#         "$CLAUDE_BODY_FILE" (/tmp/pr-body-claude.md, written by Claude per SKILL.md step 4)
 # Writes: pr-url / summary to GITHUB_OUTPUT
 set -euo pipefail
 
