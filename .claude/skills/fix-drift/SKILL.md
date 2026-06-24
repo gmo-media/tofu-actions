@@ -43,3 +43,13 @@ This means: incorporate the external changes into your .tf files.
 After making changes, run: `$tf_binary plan` within directory `$dir`.
 The plan MUST show "No changes. Your infrastructure matches the configuration."
 If there are still differences, continue fixing until plan shows no changes.
+
+4. Write PR body description
+Once the plan is clean (or you have made your best attempt), write a description of what you changed to `/tmp/pr-body-claude.md` (this path is read by `drift-fix-claude/scripts/create-pr.sh`).
+Write in Japanese. The description should explain:
+- What drift was detected (what had changed in the real infrastructure)
+- Which .tf files were changed and what was updated in each
+- Any notable decisions or trade-offs you made (e.g. why you used a `moved` block)
+
+Keep it concise and factual — this goes directly into the pull request body for human reviewers.
+Do NOT include the review checklist or boilerplate footer; those are added automatically.
