@@ -45,7 +45,7 @@ The plan MUST show "No changes. Your infrastructure matches the configuration."
 If there are still differences, continue fixing until plan shows no changes.
 
 4. Write PR body description
-Once the plan is clean (or you have made your best attempt), write a description of what you changed to `/tmp/pr-body-claude.md`.
+Once the plan is clean (or you have made your best attempt), write a description of what you changed to `/tmp/pr-body-claude.md` (this path is read by `drift-fix-claude/scripts/create-pr.sh`).
 Write in Japanese. The description should explain:
 - What drift was detected (what had changed in the real infrastructure)
 - Which .tf files were changed and what was updated in each

@@ -60,8 +60,8 @@ else
   VERIFIED_LINE="- 検証済み: 修正後に \`$TF_BINARY plan\` で「変更なし」が表示されました"
 fi
 
+# Path must match step 4 in .claude/skills/fix-drift/SKILL.md
 CLAUDE_BODY_FILE=/tmp/pr-body-claude.md
-: > "$CLAUDE_BODY_FILE"
 
 cat >> "$BODY_FILE" <<EOF
 ## 🤖 ドリフト自動修正
@@ -72,6 +72,7 @@ EOF
 
 if [ -s "$CLAUDE_BODY_FILE" ]; then
   cat "$CLAUDE_BODY_FILE" >> "$BODY_FILE"
+  echo >> "$BODY_FILE"
 else
   cat >> "$BODY_FILE" <<EOF
 ### 何が起きたのか？
@@ -106,7 +107,9 @@ if [ "$MODE" = "update" ]; then
   # draft/ready state always reflect the current verdict.
   gh pr edit "$EXISTING_PR_NUMBER" --title "$TITLE" --body-file "$BODY_FILE"
 
-  IS_DRAFT=$(gh pr view "$EXISTING_PR_NUMBER" --json isDraft -q .isDraft)
+  _pr_view=$(gh pr view "$EXISTING_PR_NUMBER" --json isDraft,url)
+  IS_DRAFT=$(echo "$_pr_view" | jq -r '.isDraft')
+  PR_URL=$(echo "$_pr_view" | jq -r '.url')
   if [ "$VERDICT" = "pr" ] && [ "$IS_DRAFT" = "true" ]; then
     gh pr ready "$EXISTING_PR_NUMBER"
   elif [ "$VERDICT" = "draft-pr" ] && [ "$IS_DRAFT" = "false" ]; then
@@ -120,7 +123,6 @@ if [ "$MODE" = "update" ]; then
   fi
   gh pr comment "$EXISTING_PR_NUMBER" --body "🤖 このブランチ上で前回の自動修正以降に \`$DIR\` で新たなドリフトが検出されたため（インフラが再び変更されました）、自動修正を再実行しました。$RESULT_LINE"
 
-  PR_URL=$(gh pr view "$EXISTING_PR_NUMBER" --json url -q .url)
   echo "Pull request updated: $PR_URL"
 else
   PR_URL=$(gh pr create \
