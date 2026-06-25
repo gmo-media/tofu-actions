@@ -1,0 +1,29 @@
+# Run tofu state list with optional filter
+name: State List
+run-name: State List (${{ inputs.dir }}) filter=${{ inputs.filter }}
+
+on:
+  workflow_call:
+    inputs:
+      dir:
+        description: Directory to run in
+        type: string
+        required: true
+      filter:
+        description: grep filter (empty = show all)
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  state-list:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: gmo-media/tofu-actions/state-list@v5
+        with:
+          dir: ${{ inputs.dir }}
+          filter: ${{ inputs.filter }}
