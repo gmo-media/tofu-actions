@@ -1,0 +1,31 @@
+# Run tofu state list with optional filter
+name: State List
+run-name: State List (${{ inputs.dir }}) filter=${{ inputs.filter }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      dir:
+        description: Directory to run in
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - prod
+      filter:
+        description: grep filter (empty = show all)
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  state-list:
+    uses: gmo-media/tofu-actions/.github/workflows/quickstart-state-list.yaml@v5
+    with:
+      dir: ${{ inputs.dir }}
+      filter: ${{ inputs.filter }}
