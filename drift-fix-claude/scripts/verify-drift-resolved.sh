@@ -72,7 +72,7 @@ case "$VERDICT" in
       gh pr comment "$EXISTING_PR_NUMBER" --body "🤖 New drift was detected in \`$DIR\` and the automated fix was re-run, but no further changes were needed — this PR's branch already plans clean. Leaving the PR open for review."
       PR_URL=$(gh pr view "$EXISTING_PR_NUMBER" --json url -q .url)
       echo "Drift in \`$DIR\` was re-checked on open PR #$EXISTING_PR_NUMBER; its branch already resolves it (no new changes needed)." >> "$GITHUB_STEP_SUMMARY"
-      echo "summary=Drift in \`$DIR\` was re-checked; open PR #$EXISTING_PR_NUMBER already resolves it: $PR_URL" >> "$GITHUB_OUTPUT"
+      echo "summary=Drift in \`$DIR\` was re-checked; open <${PR_URL}|PR #${EXISTING_PR_NUMBER}> already resolves it." >> "$GITHUB_OUTPUT"
     else
       echo "Drift in \`$DIR\` is already resolved; skipping PR creation." >> "$GITHUB_STEP_SUMMARY"
       echo "summary=Drift in \`$DIR\` was already resolved; no PR needed." >> "$GITHUB_OUTPUT"

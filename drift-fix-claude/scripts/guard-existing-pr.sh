@@ -95,7 +95,7 @@ if [ "$HAS_HUMAN" = "true" ]; then
   {
     echo "skip=true"
     echo "existing-pr-number=$EXISTING_PR"
-    echo "summary=Drift detected in \`$DIR\`; open PR #$EXISTING_PR has human commits (handled manually)."
+    echo "summary=Drift detected in \`$DIR\`; open <${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${EXISTING_PR}|PR #${EXISTING_PR}> has human commits (handled manually)."
   } >> "$GITHUB_OUTPUT"
   echo "Skipped drift fix for \`$DIR\`: open PR #$EXISTING_PR has human commits." >> "$GITHUB_STEP_SUMMARY"
   exit 0
@@ -146,7 +146,7 @@ case "$PLAN_EXIT_CODE" in
     {
       echo "skip=true"
       echo "existing-pr-number=$EXISTING_PR"
-      echo "summary=Drift detected in \`$DIR\`; open PR #$EXISTING_PR already resolves it."
+      echo "summary=Drift detected in \`$DIR\`; open <${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${EXISTING_PR}|PR #${EXISTING_PR}> already resolves it."
     } >> "$GITHUB_OUTPUT"
     echo "Skipped drift fix for \`$DIR\`: open PR #$EXISTING_PR still resolves the drift." >> "$GITHUB_STEP_SUMMARY"
     ;;
