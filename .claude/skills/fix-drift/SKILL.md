@@ -14,6 +14,7 @@ Your goal is to update the .tf files to match the current real-world infrastruct
 - Only make changes to .tf files and run `$tf_binary plan`.
 - Always choose the least destructive approach. Be surgical and precise with your edits.
 - NEVER leave the configuration in a state where `$tf_binary plan` would destroy and then recreate a resource (the `-/+` / `+/-` actions, shown as "must be replaced" / "forces replacement"). If one of your edits causes a replacement, revert or rework that edit until no replacement remains (e.g. use a `moved` block instead of renaming a resource). A leftover change that only creates or only destroys a resource is tolerable; a paired destroy-and-create of the same resource is not — the verification gate fails the whole run if one remains.
+- When you **delete** a resource block from a .tf file, also search the entire `$dir` for any `import` or `moved` block whose `to` attribute targets that resource address (e.g. `to = aws_instance.example` or `to = module.foo.aws_instance.example`) and delete those blocks as well. Orphaned `import`/`moved` blocks whose target resource no longer exists cause a plan error.
 
 ## Context
 - Directory with drift: $dir
@@ -38,6 +39,7 @@ Try not to be confused by these verbose lines - try to extract only the importan
 2. Fix the drift
 Update .tf files to match the CURRENT REAL INFRASTRUCTURE STATE.
 This means: incorporate the external changes into your .tf files.
+If fixing requires **deleting** a resource block, also remove any `import` or `moved` block targeting that resource anywhere in `$dir`. Search with: `grep -rEn 'to\s*=.*<resource_type>\.<resource_name>' $dir` (the `.*` handles module-prefixed addresses like `module.foo.aws_instance.bar`).
 
 3. Validate
 After making changes, run: `$tf_binary plan` within directory `$dir`.
