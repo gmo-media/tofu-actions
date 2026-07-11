@@ -123,7 +123,7 @@ jobs:
       # If this workflow itself is failing for some reason (e.g. plan failure), AND if webhook is configured, notify the user
       - if: ${{ failure() && !cancelled() && steps.check-webhook.outputs.do-notify == 'true' && steps.fix.outcome != 'failure' }}
         name: Send Slack notification
-        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3
+        uses: slackapi/slack-github-action@fc46ded2fc4d7f11bfa62864526f920cf1a1167d # v3
         with:
           webhook: ${{ secrets.drift-notify-webhook }}
           webhook-type: incoming-webhook
