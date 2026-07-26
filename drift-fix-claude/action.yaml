@@ -151,7 +151,7 @@ runs:
     # off claude-code-base-action, which had this set).
     - name: Fix drift with Claude Code
       if: ${{ steps.guard.outputs.skip != 'true' }}
-      uses: anthropics/claude-code-action@3553f84341b92da26052e28acf1aa898f9511f32 # v1.0.177
+      uses: anthropics/claude-code-action@af0559ee4f514d1ef21826982bed13f7edc3c35e # v1.0.178
       continue-on-error: true
       env:
         GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.vertex-auth.outputs.credentials_file_path }}
