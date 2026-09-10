@@ -34,31 +34,6 @@ runs:
         exit-code: '0'
         hide-progress: true
 
-    - name: Trivy scan (report)
-      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-      with:
-        scan-type: config
-        scan-ref: ${{ inputs.dir }}
-        scanners: misconfig
-        format: table
-        output: /tmp/trivy-report-raw.txt
-        severity: LOW,MEDIUM,HIGH,CRITICAL
-        exit-code: '0'
-        hide-progress: true
-
-    - name: Trivy scan (gate)
-      id: gate
-      continue-on-error: true
-      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-      with:
-        scan-type: config
-        scan-ref: ${{ inputs.dir }}
-        scanners: misconfig
-        format: table
-        severity: ${{ inputs.severity }}
-        exit-code: '1'
-        hide-progress: true
-
     - id: result
       name: Save result and summary
       shell: bash
@@ -180,14 +155,32 @@ runs:
         LOW=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="LOW")] | length' /tmp/trivy.json)
         TOTAL=$((CRITICAL + HIGH + MEDIUM + LOW))
 
-        if [ "${{ steps.gate.outcome }}" = "failure" ]; then
-          STATUS=fail
-        else
-          STATUS=pass
-        fi
+        # Determine pass/fail purely from the counts derived above (same JSON as the matrix
+        # and the nested details), instead of running a separate gate scan. This guarantees
+        # the gate can never disagree with what's shown in the PR comment.
+        STATUS=pass
+        IFS=',' read -ra GATE_SEVERITIES <<< "${{ inputs.severity }}"
+        for sev in "${GATE_SEVERITIES[@]}"; do
+          case "$sev" in
+            CRITICAL) count=$CRITICAL ;;
+            HIGH) count=$HIGH ;;
+            MEDIUM) count=$MEDIUM ;;
+            LOW) count=$LOW ;;
+            *) count=0 ;;
+          esac
+          if [ "$count" -gt 0 ]; then
+            STATUS=fail
+            break
+          fi
+        done
 
         # Pipe-delimited summary line consumed by plan-comment: dir|critical|high|medium|low|total|status
         echo "${{ inputs.dir }}|$CRITICAL|$HIGH|$MEDIUM|$LOW|$TOTAL|$STATUS" > /tmp/trivy-summary-${{ steps.artifact-name.outputs.name }}.txt
+
+        # Render the human-readable table from the already-computed JSON (no re-scan), using
+        # `trivy convert`. The trivy binary is already on $GITHUB_PATH, added by the setup-trivy
+        # step that ran as part of "Trivy scan (json)" above.
+        trivy convert --format table --severity LOW,MEDIUM,HIGH,CRITICAL --output /tmp/trivy-report-raw.txt /tmp/trivy.json
 
         echo '### Trivy scan (${{ inputs.dir }})' >> $GITHUB_STEP_SUMMARY
         echo "Critical: $CRITICAL, High: $HIGH, Medium: $MEDIUM, Low: $LOW" >> $GITHUB_STEP_SUMMARY
