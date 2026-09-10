@@ -39,7 +39,8 @@ runs:
       name: Composite plan and trivy texts
       shell: bash
       run: |
-        echo "## Plan" > /tmp/comment.txt
+        # ---- Plan section: posted as its own PR comment (message-id: plan-<PR#>) ----
+        echo "## Plan" > /tmp/plan-comment.txt
 
         if ls -d -- /tmp/plan-*.txt >/dev/null 2>&1; then
           found=true
@@ -48,11 +49,11 @@ runs:
         fi
 
         if [ "$found" = true ]; then
-          echo 'These plans will be automatically applied upon merging this PR.' >> /tmp/comment.txt
-          echo '' >> /tmp/comment.txt
-          echo 'To manually apply these plans, visit' >> /tmp/comment.txt
-          echo '${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}' >> /tmp/comment.txt
-          echo 'and fill `${{ github.run_id }}` to run_id parameter.' >> /tmp/comment.txt
+          echo 'These plans will be automatically applied upon merging this PR.' >> /tmp/plan-comment.txt
+          echo '' >> /tmp/plan-comment.txt
+          echo 'To manually apply these plans, visit' >> /tmp/plan-comment.txt
+          echo '${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}' >> /tmp/plan-comment.txt
+          echo 'and fill `${{ github.run_id }}` to run_id parameter.' >> /tmp/plan-comment.txt
         fi
 
         while IFS= read -r -d '' file; do
@@ -60,18 +61,26 @@ runs:
           dir_name="${dir_name%.txt}"
           dir_name="${dir_name//___/\/}"
 
-          echo "### $dir_name" >> /tmp/comment.txt
-          echo '```' >> /tmp/comment.txt
-          cat $file >> /tmp/comment.txt
-          echo '```' >> /tmp/comment.txt
+          echo "### $dir_name" >> /tmp/plan-comment.txt
+          echo '```' >> /tmp/plan-comment.txt
+          cat $file >> /tmp/plan-comment.txt
+          echo '```' >> /tmp/plan-comment.txt
         done < <(find /tmp -maxdepth 1 -name 'plan-*.txt' -print0 | sort -z)
 
         if [ "$found" = false ]; then
-          echo 'No plan output found. If plans are failing, check their logs.' >> /tmp/comment.txt
+          echo 'No plan output found. If plans are failing, check their logs.' >> /tmp/plan-comment.txt
         fi
 
-        echo '' >> /tmp/comment.txt
-        echo '## Security scan (Trivy)' >> /tmp/comment.txt
+        echo 'plan-comment<<EOF' >> $GITHUB_OUTPUT
+        cat /tmp/plan-comment.txt >> $GITHUB_OUTPUT
+        echo 'EOF' >> $GITHUB_OUTPUT
+        PLAN_LENGTH=$(wc -c /tmp/plan-comment.txt | awk '{print $1}')
+        echo "plan-length=$PLAN_LENGTH" >> $GITHUB_OUTPUT
+
+        # ---- Trivy section: posted as its own PR comment (message-id: trivy-<PR#>) ----
+        # Kept separate from Plan so that a large Trivy result (many findings) never pushes
+        # the Plan comment itself into the "too long" fallback.
+        echo '## Security scan (Trivy)' > /tmp/trivy-comment.txt
 
         if find /tmp -maxdepth 1 -name 'trivy-*.txt' ! -name 'trivy-summary-*' -print -quit 2>/dev/null | grep -q .; then
           trivy_found=true
@@ -80,9 +89,9 @@ runs:
         fi
 
         if [ "$trivy_found" = true ] && ls -d -- /tmp/trivy-summary-*.txt >/dev/null 2>&1; then
-          echo '' >> /tmp/comment.txt
-          echo '| Directory | Critical | High | Medium | Low | Status |' >> /tmp/comment.txt
-          echo '|---|---|---|---|---|---|' >> /tmp/comment.txt
+          echo '' >> /tmp/trivy-comment.txt
+          echo '| Directory | Critical | High | Medium | Low | Status |' >> /tmp/trivy-comment.txt
+          echo '|---|---|---|---|---|---|' >> /tmp/trivy-comment.txt
 
           while IFS='|' read -r dir critical high medium low total status; do
             if [ "$status" = "fail" ]; then
@@ -90,7 +99,7 @@ runs:
             else
               badge='✅ Pass'
             fi
-            echo "| $dir | $critical | $high | $medium | $low | $badge |" >> /tmp/comment.txt
+            echo "| $dir | $critical | $high | $medium | $low | $badge |" >> /tmp/trivy-comment.txt
           done < <(find /tmp -maxdepth 1 -name 'trivy-summary-*.txt' -print0 | sort -z | xargs -0 cat)
         fi
 
@@ -109,38 +118,39 @@ runs:
 
           # $file contains pre-formatted nested <details> markdown (file > resource), not plain text,
           # so it is embedded directly rather than wrapped in a code fence.
-          echo '' >> /tmp/comment.txt
-          echo '<details>' >> /tmp/comment.txt
-          echo "<summary>$label</summary>" >> /tmp/comment.txt
-          echo '' >> /tmp/comment.txt
-          cat $file >> /tmp/comment.txt
-          echo '' >> /tmp/comment.txt
-          echo '</details>' >> /tmp/comment.txt
+          echo '' >> /tmp/trivy-comment.txt
+          echo '<details>' >> /tmp/trivy-comment.txt
+          echo "<summary>$label</summary>" >> /tmp/trivy-comment.txt
+          echo '' >> /tmp/trivy-comment.txt
+          cat $file >> /tmp/trivy-comment.txt
+          echo '' >> /tmp/trivy-comment.txt
+          echo '</details>' >> /tmp/trivy-comment.txt
         done < <(find /tmp -maxdepth 1 -name 'trivy-*.txt' ! -name 'trivy-summary-*' -print0 | sort -z)
 
         if [ "$trivy_found" = false ]; then
-          echo 'No Trivy scan output found. If the scan is failing, check its logs.' >> /tmp/comment.txt
+          echo '' >> /tmp/trivy-comment.txt
+          echo 'No Trivy scan output found. If the scan is failing, check its logs.' >> /tmp/trivy-comment.txt
         else
-          echo '' >> /tmp/comment.txt
-          echo 'To suppress a specific finding, see [Filtering resources by inline comments](https://trivy.dev/latest/docs/scanner/misconfiguration/config/config/#filtering-resources-by-inline-comments) (e.g. `#trivy:ignore:<ID>`).' >> /tmp/comment.txt
+          echo '' >> /tmp/trivy-comment.txt
+          echo 'To suppress a specific finding, see [Filtering resources by inline comments](https://trivy.dev/latest/docs/scanner/misconfiguration/config/config/#filtering-resources-by-inline-comments) (e.g. `#trivy:ignore:<ID>`).' >> /tmp/trivy-comment.txt
         fi
 
-        echo 'comment<<EOF' >> $GITHUB_OUTPUT
-        cat /tmp/comment.txt >> $GITHUB_OUTPUT
+        echo 'trivy-comment<<EOF' >> $GITHUB_OUTPUT
+        cat /tmp/trivy-comment.txt >> $GITHUB_OUTPUT
         echo 'EOF' >> $GITHUB_OUTPUT
-        LENGTH=$(wc -c /tmp/comment.txt | awk '{print $1}')
-        echo "length=$LENGTH" >> $GITHUB_OUTPUT
+        TRIVY_LENGTH=$(wc -c /tmp/trivy-comment.txt | awk '{print $1}')
+        echo "trivy-length=$TRIVY_LENGTH" >> $GITHUB_OUTPUT
 
-    - if: ${{ steps.composite.outputs.length > 50000 }}
-      name: Add comment
+    - if: ${{ steps.composite.outputs.plan-length > 50000 }}
+      name: Add plan comment (too long)
       uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
       with:
         message-id: plan-${{ github.event.pull_request.number }}
-        message-failure: Plan or Trivy scan was not successful
+        message-failure: Plan was not successful
         message: |
           ## Plan
 
-          Plan and Trivy scan results were too long (> 50k chars) to include in PR comment.
+          Plan results were too long (> 50k chars) to include in PR comment.
           Please check actions summary for more info.
           ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
@@ -150,13 +160,34 @@ runs:
           ${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}
           and fill `${{ github.run_id }}` to run_id parameter.
 
-    - if: ${{ steps.composite.outputs.length <= 50000 }}
-      name: Add comment
+    - if: ${{ steps.composite.outputs.plan-length <= 50000 }}
+      name: Add plan comment
       uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
       with:
         message-id: plan-${{ github.event.pull_request.number }}
-        message-failure: Plan or Trivy scan was not successful
-        message: ${{ steps.composite.outputs.comment }}
+        message-failure: Plan was not successful
+        message: ${{ steps.composite.outputs.plan-comment }}
+
+    - if: ${{ steps.composite.outputs.trivy-length > 50000 }}
+      name: Add trivy comment (too long)
+      uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
+      with:
+        message-id: trivy-${{ github.event.pull_request.number }}
+        message-failure: Trivy scan was not successful
+        message: |
+          ## Security scan (Trivy)
+
+          Trivy scan results were too long (> 50k chars) to include in PR comment.
+          Please check actions summary for more info.
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - if: ${{ steps.composite.outputs.trivy-length <= 50000 }}
+      name: Add trivy comment
+      uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
+      with:
+        message-id: trivy-${{ github.event.pull_request.number }}
+        message-failure: Trivy scan was not successful
+        message: ${{ steps.composite.outputs.trivy-comment }}
 
     - if: ${{ inputs.force-fail == 'true' }}
       name: Force fail
