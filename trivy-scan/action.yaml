@@ -99,26 +99,21 @@ runs:
             url=$(jq -r '.url' <<<"$finding_json")
             icon=$(sev_icon "$severity")
 
-            location="$resource"
             range=""
             if [ "$start" != "0" ]; then
               if [ "$start" = "$end" ]; then
                 range="$start"
-                location="$location (L$start)"
               else
                 range="$start-$end"
-                location="$location (L$start-$end)"
               fi
             fi
 
             {
               echo "<details>"
-              echo "<summary>$icon $severity · $id · $location</summary>"
+              echo "<summary>$icon $severity · $id · $title · $resource</summary>"
               echo ''
               if [ -n "$description" ] && [ "$description" != "null" ]; then
                 echo "$description"
-              else
-                echo "$title"
               fi
 
               code_lines=$(jq -r '.code[]? | "\(.number)\t\(.cause)\t\(.content)"' <<<"$finding_json")
