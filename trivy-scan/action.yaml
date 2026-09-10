@@ -1,5 +1,5 @@
 name: Trivy scan
-description: Runs a Trivy IaC (misconfiguration) scan on a directory and uploads the result as an artifact.
+description: Runs a Trivy IaC (misconfiguration) scan on a directory and uploads the result and severity summary as artifacts.
 
 inputs:
   dir:
@@ -21,6 +21,18 @@ runs:
         DIR="${{ inputs.dir }}"
         NAME="${DIR//\//___}"
         echo "name=$NAME" >> $GITHUB_OUTPUT
+
+    - name: Trivy scan (json)
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        scan-type: config
+        scan-ref: ${{ inputs.dir }}
+        scanners: misconfig
+        format: json
+        output: /tmp/trivy.json
+        severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+        exit-code: '0'
+        hide-progress: true
 
     - name: Trivy scan (report)
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -48,17 +60,33 @@ runs:
         hide-progress: true
 
     - id: result
-      name: Save result
+      name: Save result and summary
       shell: bash
       run: |
         cp /tmp/trivy-raw.txt /tmp/trivy-${{ steps.artifact-name.outputs.name }}.txt
 
+        CRITICAL=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="CRITICAL")] | length' /tmp/trivy.json)
+        HIGH=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="HIGH")] | length' /tmp/trivy.json)
+        MEDIUM=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="MEDIUM")] | length' /tmp/trivy.json)
+        LOW=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="LOW")] | length' /tmp/trivy.json)
+        TOTAL=$((CRITICAL + HIGH + MEDIUM + LOW))
+
+        if [ "${{ steps.gate.outcome }}" = "failure" ]; then
+          STATUS=fail
+        else
+          STATUS=pass
+        fi
+
+        # Pipe-delimited summary line consumed by plan-comment: dir|critical|high|medium|low|total|status
+        echo "${{ inputs.dir }}|$CRITICAL|$HIGH|$MEDIUM|$LOW|$TOTAL|$STATUS" > /tmp/trivy-summary-${{ steps.artifact-name.outputs.name }}.txt
+
         echo '### Trivy scan (${{ inputs.dir }})' >> $GITHUB_STEP_SUMMARY
+        echo "Critical: $CRITICAL, High: $HIGH, Medium: $MEDIUM, Low: $LOW" >> $GITHUB_STEP_SUMMARY
         echo '```plaintext' >> $GITHUB_STEP_SUMMARY
         cat /tmp/trivy-raw.txt >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
 
-        if [ "${{ steps.gate.outcome }}" = "failure" ]; then
+        if [ "$STATUS" = "fail" ]; then
           echo "has-issues=true" >> $GITHUB_OUTPUT
         else
           echo "has-issues=false" >> $GITHUB_OUTPUT
@@ -69,6 +97,12 @@ runs:
       with:
         name: trivy-text-${{ steps.artifact-name.outputs.name }}
         path: /tmp/trivy-${{ steps.artifact-name.outputs.name }}.txt
+
+    - name: Upload trivy summary
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      with:
+        name: trivy-summary-${{ steps.artifact-name.outputs.name }}
+        path: /tmp/trivy-summary-${{ steps.artifact-name.outputs.name }}.txt
 
     - if: ${{ steps.result.outputs.has-issues == 'true' }}
       name: Fail if severity threshold exceeded

@@ -28,6 +28,13 @@ runs:
         path: /tmp/
         merge-multiple: true
 
+    - name: Download trivy summaries
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      with:
+        pattern: trivy-summary-*
+        path: /tmp/
+        merge-multiple: true
+
     - id: composite
       name: Composite plan and trivy texts
       shell: bash
@@ -66,10 +73,25 @@ runs:
         echo '' >> /tmp/comment.txt
         echo '## Security scan (Trivy)' >> /tmp/comment.txt
 
-        if ls -d -- /tmp/trivy-*.txt >/dev/null 2>&1; then
+        if find /tmp -maxdepth 1 -name 'trivy-*.txt' ! -name 'trivy-summary-*' -print -quit 2>/dev/null | grep -q .; then
           trivy_found=true
         else
           trivy_found=false
+        fi
+
+        if [ "$trivy_found" = true ] && ls -d -- /tmp/trivy-summary-*.txt >/dev/null 2>&1; then
+          echo '' >> /tmp/comment.txt
+          echo '| Directory | Critical | High | Medium | Low | Status |' >> /tmp/comment.txt
+          echo '|---|---|---|---|---|---|' >> /tmp/comment.txt
+
+          while IFS='|' read -r dir critical high medium low total status; do
+            if [ "$status" = "fail" ]; then
+              badge='🚨 Fail'
+            else
+              badge='✅ Pass'
+            fi
+            echo "| $dir | $critical | $high | $medium | $low | $badge |" >> /tmp/comment.txt
+          done < <(cat /tmp/trivy-summary-*.txt)
         fi
 
         while IFS= read -r -d '' file; do
@@ -77,11 +99,23 @@ runs:
           dir_name="${dir_name%.txt}"
           dir_name="${dir_name//___/\/}"
 
-          echo "### $dir_name" >> /tmp/comment.txt
+          summary_line=$(awk -F'|' -v d="$dir_name" '$1==d {print; exit}' /tmp/trivy-summary-*.txt 2>/dev/null)
+          if [ -n "$summary_line" ]; then
+            IFS='|' read -r _ critical high medium low total status <<< "$summary_line"
+            label="$dir_name — ${total} issues (Critical: $critical, High: $high, Medium: $medium, Low: $low)"
+          else
+            label="$dir_name"
+          fi
+
+          echo '' >> /tmp/comment.txt
+          echo '<details>' >> /tmp/comment.txt
+          echo "<summary>$label</summary>" >> /tmp/comment.txt
+          echo '' >> /tmp/comment.txt
           echo '```' >> /tmp/comment.txt
           cat $file >> /tmp/comment.txt
           echo '```' >> /tmp/comment.txt
-        done < <(find /tmp -name 'trivy-*.txt' -print0)
+          echo '</details>' >> /tmp/comment.txt
+        done < <(find /tmp -maxdepth 1 -name 'trivy-*.txt' ! -name 'trivy-summary-*' -print0)
 
         if [ "$trivy_found" = false ]; then
           echo 'No Trivy scan output found. If the scan is failing, check its logs.' >> /tmp/comment.txt
