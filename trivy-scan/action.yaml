@@ -180,7 +180,7 @@ runs:
         # Render the human-readable table from the already-computed JSON (no re-scan), using
         # `trivy convert`. The trivy binary is already on $GITHUB_PATH, added by the setup-trivy
         # step that ran as part of "Trivy scan (json)" above.
-        trivy convert --format table --severity LOW,MEDIUM,HIGH,CRITICAL --output /tmp/trivy-report-raw.txt /tmp/trivy.json
+        trivy convert --format table --scanners misconfig --severity LOW,MEDIUM,HIGH,CRITICAL --output /tmp/trivy-report-raw.txt /tmp/trivy.json
 
         echo '### Trivy scan (${{ inputs.dir }})' >> $GITHUB_STEP_SUMMARY
         echo "Critical: $CRITICAL, High: $HIGH, Medium: $MEDIUM, Low: $LOW" >> $GITHUB_STEP_SUMMARY
