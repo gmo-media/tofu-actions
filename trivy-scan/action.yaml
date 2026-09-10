@@ -63,7 +63,85 @@ runs:
       name: Save result and summary
       shell: bash
       run: |
-        cp /tmp/trivy-raw.txt /tmp/trivy-${{ steps.artifact-name.outputs.name }}.txt
+        DETAIL_FILE="/tmp/trivy-${{ steps.artifact-name.outputs.name }}.txt"
+        : > "$DETAIL_FILE"
+
+        sev_icon() {
+          case "$1" in
+            CRITICAL) printf '🟣';;
+            HIGH) printf '🔴';;
+            MEDIUM) printf '🟠';;
+            LOW) printf '🟡';;
+            *) printf '⚪';;
+          esac
+        }
+
+        # Build nested <details> markdown: file > resource (finding), for the PR comment.
+        # The full raw table output remains available in the job summary below.
+        while IFS= read -r result_json; do
+          target=$(jq -r '.target' <<<"$result_json")
+          count=$(jq -r '.findings | length' <<<"$result_json")
+
+          {
+            echo "<details>"
+            echo "<summary>📄 $target — $count issues</summary>"
+            echo ''
+          } >> "$DETAIL_FILE"
+
+          while IFS= read -r finding_json; do
+            severity=$(jq -r '.severity' <<<"$finding_json")
+            id=$(jq -r '.id' <<<"$finding_json")
+            title=$(jq -r '.title' <<<"$finding_json")
+            resource=$(jq -r '.resource' <<<"$finding_json")
+            start=$(jq -r '.start' <<<"$finding_json")
+            end=$(jq -r '.end' <<<"$finding_json")
+            url=$(jq -r '.url' <<<"$finding_json")
+            icon=$(sev_icon "$severity")
+
+            location="$resource"
+            if [ "$start" != "0" ]; then
+              if [ "$start" = "$end" ]; then
+                location="$location (L$start)"
+              else
+                location="$location (L$start-$end)"
+              fi
+            fi
+
+            {
+              echo "<details>"
+              echo "<summary>$icon $severity · $id · $location</summary>"
+              echo ''
+              echo "$title"
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo "See $url"
+              fi
+              echo ''
+              echo '</details>'
+              echo ''
+            } >> "$DETAIL_FILE"
+          done < <(jq -c '.findings[]' <<<"$result_json")
+
+          echo '</details>' >> "$DETAIL_FILE"
+          echo '' >> "$DETAIL_FILE"
+        done < <(jq -c '
+          [.Results[]? | select((.Misconfigurations // []) | length > 0)]
+          | map({
+              target: .Target,
+              findings: [.Misconfigurations[] | {
+                severity: .Severity,
+                id: (.ID // .AVDID // "UNKNOWN"),
+                title: .Title,
+                resource: (.CauseMetadata.Resource // "-"),
+                start: (.CauseMetadata.StartLine // 0),
+                end: (.CauseMetadata.EndLine // 0),
+                url: (.PrimaryURL // "")
+              }]
+            })[]
+        ' /tmp/trivy.json)
+
+        if [ ! -s "$DETAIL_FILE" ]; then
+          echo 'No issues found.' > "$DETAIL_FILE"
+        fi
 
         CRITICAL=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="CRITICAL")] | length' /tmp/trivy.json)
         HIGH=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="HIGH")] | length' /tmp/trivy.json)

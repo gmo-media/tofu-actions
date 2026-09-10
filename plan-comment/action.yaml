@@ -107,13 +107,14 @@ runs:
             label="$dir_name"
           fi
 
+          # $file contains pre-formatted nested <details> markdown (file > resource), not plain text,
+          # so it is embedded directly rather than wrapped in a code fence.
           echo '' >> /tmp/comment.txt
           echo '<details>' >> /tmp/comment.txt
           echo "<summary>$label</summary>" >> /tmp/comment.txt
           echo '' >> /tmp/comment.txt
-          echo '```' >> /tmp/comment.txt
           cat $file >> /tmp/comment.txt
-          echo '```' >> /tmp/comment.txt
+          echo '' >> /tmp/comment.txt
           echo '</details>' >> /tmp/comment.txt
         done < <(find /tmp -maxdepth 1 -name 'trivy-*.txt' ! -name 'trivy-summary-*' -print0 | sort -z)
 
