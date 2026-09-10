@@ -2,6 +2,9 @@ name: Trivy scan
 description: Runs a Trivy IaC (misconfiguration) scan on a directory and uploads the result and severity summary as artifacts.
 
 inputs:
+  config:
+    description: tofu-actions config file
+    default: .github/tofu-actions-config.js
   dir:
     description: Directory to run in
     required: true
@@ -22,6 +25,35 @@ runs:
         NAME="${DIR//\//___}"
         echo "name=$NAME" >> $GITHUB_OUTPUT
 
+    - id: skip-dirs
+      name: Compute sibling/child dirs to skip
+      shell: bash
+      run: |
+        # Other directories configured in tofu-actions-config.js that are nested inside this
+        # dir (e.g. "prod/alink" when scanning "prod") get their own separate trivy-scan job,
+        # so `trivy config` must not recurse into them here — otherwise the same finding shows
+        # up twice (once in each job's comment), and an unrelated child dir's pre-existing HIGH
+        # finding can fail this dir's gate even though this dir itself wasn't touched.
+        #
+        # This is intentionally fail-soft: if the config can't be read/parsed for any reason,
+        # we fall back to no skip-dirs (today's behavior) rather than failing the scan — trivy-scan
+        # otherwise has no dependency on tofu-actions-config.js being valid (e.g. it needs no
+        # AWS/GCP auth config), and this optimization shouldn't introduce one.
+        SKIP_DIRS=$(node -e "
+          const path = require('node:path');
+          const dir = '${{ inputs.dir }}';
+          import(path.resolve(process.cwd(), '${{ inputs.config }}'))
+            .then(m => {
+              const dirs = Object.keys((m.default && m.default.dirs) || {});
+              const children = dirs
+                .filter(d => d !== dir && d.startsWith(dir + '/'))
+                .map(d => d.slice(dir.length + 1));
+              console.log(children.join(','));
+            })
+            .catch(() => console.log(''));
+        " 2>/dev/null || true)
+        echo "value=$SKIP_DIRS" >> $GITHUB_OUTPUT
+
     - name: Trivy scan (json)
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
       with:
@@ -31,6 +63,7 @@ runs:
         format: json
         output: /tmp/trivy.json
         severity: LOW,MEDIUM,HIGH,CRITICAL
+        skip-dirs: ${{ steps.skip-dirs.outputs.value }}
         exit-code: '0'
         hide-progress: true
 
