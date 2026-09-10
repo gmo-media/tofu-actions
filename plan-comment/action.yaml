@@ -40,7 +40,7 @@ runs:
       shell: bash
       run: |
         # ---- Plan section: posted as its own PR comment (message-id: plan-<PR#>) ----
-        echo "## Plan" > /tmp/plan-comment.txt
+        echo "## Plan" > /tmp/pr-comment-plan.txt
 
         if ls -d -- /tmp/plan-*.txt >/dev/null 2>&1; then
           found=true
@@ -49,11 +49,11 @@ runs:
         fi
 
         if [ "$found" = true ]; then
-          echo 'These plans will be automatically applied upon merging this PR.' >> /tmp/plan-comment.txt
-          echo '' >> /tmp/plan-comment.txt
-          echo 'To manually apply these plans, visit' >> /tmp/plan-comment.txt
-          echo '${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}' >> /tmp/plan-comment.txt
-          echo 'and fill `${{ github.run_id }}` to run_id parameter.' >> /tmp/plan-comment.txt
+          echo 'These plans will be automatically applied upon merging this PR.' >> /tmp/pr-comment-plan.txt
+          echo '' >> /tmp/pr-comment-plan.txt
+          echo 'To manually apply these plans, visit' >> /tmp/pr-comment-plan.txt
+          echo '${{ github.server_url }}/${{ github.repository }}/actions/workflows/${{ inputs.apply_workflow_id }}' >> /tmp/pr-comment-plan.txt
+          echo 'and fill `${{ github.run_id }}` to run_id parameter.' >> /tmp/pr-comment-plan.txt
         fi
 
         while IFS= read -r -d '' file; do
@@ -61,26 +61,26 @@ runs:
           dir_name="${dir_name%.txt}"
           dir_name="${dir_name//___/\/}"
 
-          echo "### $dir_name" >> /tmp/plan-comment.txt
-          echo '```' >> /tmp/plan-comment.txt
-          cat $file >> /tmp/plan-comment.txt
-          echo '```' >> /tmp/plan-comment.txt
+          echo "### $dir_name" >> /tmp/pr-comment-plan.txt
+          echo '```' >> /tmp/pr-comment-plan.txt
+          cat $file >> /tmp/pr-comment-plan.txt
+          echo '```' >> /tmp/pr-comment-plan.txt
         done < <(find /tmp -maxdepth 1 -name 'plan-*.txt' -print0 | sort -z)
 
         if [ "$found" = false ]; then
-          echo 'No plan output found. If plans are failing, check their logs.' >> /tmp/plan-comment.txt
+          echo 'No plan output found. If plans are failing, check their logs.' >> /tmp/pr-comment-plan.txt
         fi
 
         echo 'plan-comment<<EOF' >> $GITHUB_OUTPUT
-        cat /tmp/plan-comment.txt >> $GITHUB_OUTPUT
+        cat /tmp/pr-comment-plan.txt >> $GITHUB_OUTPUT
         echo 'EOF' >> $GITHUB_OUTPUT
-        PLAN_LENGTH=$(wc -c /tmp/plan-comment.txt | awk '{print $1}')
+        PLAN_LENGTH=$(wc -c /tmp/pr-comment-plan.txt | awk '{print $1}')
         echo "plan-length=$PLAN_LENGTH" >> $GITHUB_OUTPUT
 
         # ---- Trivy section: posted as its own PR comment (message-id: trivy-<PR#>) ----
         # Kept separate from Plan so that a large Trivy result (many findings) never pushes
         # the Plan comment itself into the "too long" fallback.
-        echo '## Security scan (Trivy)' > /tmp/trivy-comment.txt
+        echo '## Security scan (Trivy)' > /tmp/pr-comment-trivy.txt
 
         if find /tmp -maxdepth 1 -name 'trivy-*.txt' ! -name 'trivy-summary-*' -print -quit 2>/dev/null | grep -q .; then
           trivy_found=true
@@ -89,9 +89,9 @@ runs:
         fi
 
         if [ "$trivy_found" = true ] && ls -d -- /tmp/trivy-summary-*.txt >/dev/null 2>&1; then
-          echo '' >> /tmp/trivy-comment.txt
-          echo '| Directory | Critical | High | Medium | Low | Status |' >> /tmp/trivy-comment.txt
-          echo '|---|---|---|---|---|---|' >> /tmp/trivy-comment.txt
+          echo '' >> /tmp/pr-comment-trivy.txt
+          echo '| Directory | Critical | High | Medium | Low | Status |' >> /tmp/pr-comment-trivy.txt
+          echo '|---|---|---|---|---|---|' >> /tmp/pr-comment-trivy.txt
 
           while IFS='|' read -r dir critical high medium low total status; do
             if [ "$status" = "fail" ]; then
@@ -99,7 +99,7 @@ runs:
             else
               badge='✅ Pass'
             fi
-            echo "| $dir | $critical | $high | $medium | $low | $badge |" >> /tmp/trivy-comment.txt
+            echo "| $dir | $critical | $high | $medium | $low | $badge |" >> /tmp/pr-comment-trivy.txt
           done < <(find /tmp -maxdepth 1 -name 'trivy-summary-*.txt' -print0 | sort -z | xargs -0 cat)
         fi
 
@@ -118,27 +118,27 @@ runs:
 
           # $file contains pre-formatted nested <details> markdown (file > resource), not plain text,
           # so it is embedded directly rather than wrapped in a code fence.
-          echo '' >> /tmp/trivy-comment.txt
-          echo '<details>' >> /tmp/trivy-comment.txt
-          echo "<summary>$label</summary>" >> /tmp/trivy-comment.txt
-          echo '' >> /tmp/trivy-comment.txt
-          cat $file >> /tmp/trivy-comment.txt
-          echo '' >> /tmp/trivy-comment.txt
-          echo '</details>' >> /tmp/trivy-comment.txt
+          echo '' >> /tmp/pr-comment-trivy.txt
+          echo '<details>' >> /tmp/pr-comment-trivy.txt
+          echo "<summary>$label</summary>" >> /tmp/pr-comment-trivy.txt
+          echo '' >> /tmp/pr-comment-trivy.txt
+          cat $file >> /tmp/pr-comment-trivy.txt
+          echo '' >> /tmp/pr-comment-trivy.txt
+          echo '</details>' >> /tmp/pr-comment-trivy.txt
         done < <(find /tmp -maxdepth 1 -name 'trivy-*.txt' ! -name 'trivy-summary-*' -print0 | sort -z)
 
         if [ "$trivy_found" = false ]; then
-          echo '' >> /tmp/trivy-comment.txt
-          echo 'No Trivy scan output found. If the scan is failing, check its logs.' >> /tmp/trivy-comment.txt
+          echo '' >> /tmp/pr-comment-trivy.txt
+          echo 'No Trivy scan output found. If the scan is failing, check its logs.' >> /tmp/pr-comment-trivy.txt
         else
-          echo '' >> /tmp/trivy-comment.txt
-          echo 'To suppress a specific finding, see [Filtering resources by inline comments](https://trivy.dev/latest/docs/scanner/misconfiguration/config/config/#filtering-resources-by-inline-comments) (e.g. `#trivy:ignore:<ID>`).' >> /tmp/trivy-comment.txt
+          echo '' >> /tmp/pr-comment-trivy.txt
+          echo 'To suppress a specific finding, see [Filtering resources by inline comments](https://trivy.dev/latest/docs/scanner/misconfiguration/config/config/#filtering-resources-by-inline-comments) (e.g. `#trivy:ignore:<ID>`).' >> /tmp/pr-comment-trivy.txt
         fi
 
         echo 'trivy-comment<<EOF' >> $GITHUB_OUTPUT
-        cat /tmp/trivy-comment.txt >> $GITHUB_OUTPUT
+        cat /tmp/pr-comment-trivy.txt >> $GITHUB_OUTPUT
         echo 'EOF' >> $GITHUB_OUTPUT
-        TRIVY_LENGTH=$(wc -c /tmp/trivy-comment.txt | awk '{print $1}')
+        TRIVY_LENGTH=$(wc -c /tmp/pr-comment-trivy.txt | awk '{print $1}')
         echo "trivy-length=$TRIVY_LENGTH" >> $GITHUB_OUTPUT
 
     - if: ${{ steps.composite.outputs.plan-length > 50000 }}
