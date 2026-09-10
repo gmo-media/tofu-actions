@@ -1,0 +1,78 @@
+name: Trivy scan
+description: Runs a Trivy IaC (misconfiguration) scan on a directory and uploads the result as an artifact.
+
+inputs:
+  dir:
+    description: Directory to run in
+    required: true
+  severity:
+    description: Comma separated list of severities that fail the scan
+    default: CRITICAL,HIGH
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+    - name: Sanitize artifact name
+      id: artifact-name
+      shell: bash
+      run: |
+        DIR="${{ inputs.dir }}"
+        NAME="${DIR//\//___}"
+        echo "name=$NAME" >> $GITHUB_OUTPUT
+
+    - name: Trivy scan (report)
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        scan-type: config
+        scan-ref: ${{ inputs.dir }}
+        scanners: misconfig
+        format: table
+        output: /tmp/trivy-raw.txt
+        severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+        exit-code: '0'
+        hide-progress: true
+
+    - name: Trivy scan (gate)
+      id: gate
+      continue-on-error: true
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        scan-type: config
+        scan-ref: ${{ inputs.dir }}
+        scanners: misconfig
+        format: table
+        severity: ${{ inputs.severity }}
+        exit-code: '1'
+        hide-progress: true
+
+    - id: result
+      name: Save result
+      shell: bash
+      run: |
+        cp /tmp/trivy-raw.txt /tmp/trivy-${{ steps.artifact-name.outputs.name }}.txt
+
+        echo '### Trivy scan (${{ inputs.dir }})' >> $GITHUB_STEP_SUMMARY
+        echo '```plaintext' >> $GITHUB_STEP_SUMMARY
+        cat /tmp/trivy-raw.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+        if [ "${{ steps.gate.outcome }}" = "failure" ]; then
+          echo "has-issues=true" >> $GITHUB_OUTPUT
+        else
+          echo "has-issues=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload trivy text
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      with:
+        name: trivy-text-${{ steps.artifact-name.outputs.name }}
+        path: /tmp/trivy-${{ steps.artifact-name.outputs.name }}.txt
+
+    - if: ${{ steps.result.outputs.has-issues == 'true' }}
+      name: Fail if severity threshold exceeded
+      shell: bash
+      run: |
+        echo "Trivy found issues at severity ${{ inputs.severity }} or above. See the scan output above / PR comment for details."
+        exit 1

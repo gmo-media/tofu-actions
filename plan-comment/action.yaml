@@ -21,8 +21,15 @@ runs:
         path: /tmp/
         merge-multiple: true
 
+    - name: Download trivy texts
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      with:
+        pattern: trivy-text-*
+        path: /tmp/
+        merge-multiple: true
+
     - id: composite
-      name: Composite plan texts
+      name: Composite plan and trivy texts
       shell: bash
       run: |
         echo "## Plan" > /tmp/comment.txt
@@ -56,6 +63,30 @@ runs:
           echo 'No plan output found. If plans are failing, check their logs.' >> /tmp/comment.txt
         fi
 
+        echo '' >> /tmp/comment.txt
+        echo '## Security scan (Trivy)' >> /tmp/comment.txt
+
+        if ls -d -- /tmp/trivy-*.txt >/dev/null 2>&1; then
+          trivy_found=true
+        else
+          trivy_found=false
+        fi
+
+        while IFS= read -r -d '' file; do
+          dir_name="${file#/tmp/trivy-}"
+          dir_name="${dir_name%.txt}"
+          dir_name="${dir_name//___/\/}"
+
+          echo "### $dir_name" >> /tmp/comment.txt
+          echo '```' >> /tmp/comment.txt
+          cat $file >> /tmp/comment.txt
+          echo '```' >> /tmp/comment.txt
+        done < <(find /tmp -name 'trivy-*.txt' -print0)
+
+        if [ "$trivy_found" = false ]; then
+          echo 'No Trivy scan output found. If the scan is failing, check its logs.' >> /tmp/comment.txt
+        fi
+
         echo 'comment<<EOF' >> $GITHUB_OUTPUT
         cat /tmp/comment.txt >> $GITHUB_OUTPUT
         echo 'EOF' >> $GITHUB_OUTPUT
@@ -67,11 +98,11 @@ runs:
       uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
       with:
         message-id: plan-${{ github.event.pull_request.number }}
-        message-failure: Plan was not successful
+        message-failure: Plan or Trivy scan was not successful
         message: |
           ## Plan
 
-          Plan result was too long (> 50k chars) to include in PR comment.
+          Plan and Trivy scan results were too long (> 50k chars) to include in PR comment.
           Please check actions summary for more info.
           ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
@@ -86,7 +117,7 @@ runs:
       uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
       with:
         message-id: plan-${{ github.event.pull_request.number }}
-        message-failure: Plan was not successful
+        message-failure: Plan or Trivy scan was not successful
         message: ${{ steps.composite.outputs.comment }}
 
     - if: ${{ inputs.force-fail == 'true' }}

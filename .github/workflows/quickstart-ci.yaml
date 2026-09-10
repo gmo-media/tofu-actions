@@ -44,8 +44,22 @@ jobs:
         with:
           dir: ${{ matrix.dir }}
 
+  trivy:
+    needs: [ prepare ]
+    name: Trivy scan (${{ matrix.dir }})
+    if: ${{ github.event_name == 'pull_request' && needs.prepare.outputs.strategy != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: gmo-media/tofu-actions/trivy-scan@v5
+        with:
+          dir: ${{ matrix.dir }}
+
   plan-comment:
-    needs: [ prepare, plan ]
+    needs: [ prepare, plan, trivy ]
     if: ${{ always() && github.event_name == 'pull_request' }}
     name: Plan comment
     runs-on: ubuntu-latest
