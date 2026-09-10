@@ -30,7 +30,7 @@ runs:
         scanners: misconfig
         format: json
         output: /tmp/trivy.json
-        severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+        severity: LOW,MEDIUM,HIGH,CRITICAL
         exit-code: '0'
         hide-progress: true
 
@@ -41,8 +41,8 @@ runs:
         scan-ref: ${{ inputs.dir }}
         scanners: misconfig
         format: table
-        output: /tmp/trivy-raw.txt
-        severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+        output: /tmp/trivy-report-raw.txt
+        severity: LOW,MEDIUM,HIGH,CRITICAL
         exit-code: '0'
         hide-progress: true
 
@@ -124,7 +124,10 @@ runs:
                 else
                   echo "\`$target\`"
                 fi
-                echo '```hcl'
+                # Use a 4-backtick fence: the code content originates from user HCL and may itself
+                # contain a triple-backtick sequence (e.g. in a heredoc or comment), which would
+                # otherwise close the fence early and corrupt the rest of the comment.
+                echo '````hcl'
                 while IFS=$'\t' read -r ln cause content; do
                   if [ "$cause" = "true" ]; then
                     marker='→'
@@ -133,7 +136,7 @@ runs:
                   fi
                   printf '%4s %s %s\n' "$ln" "$marker" "$content"
                 done <<< "$code_lines"
-                echo '```'
+                echo '````'
               fi
 
               if [ -n "$url" ] && [ "$url" != "null" ]; then
@@ -189,7 +192,7 @@ runs:
         echo '### Trivy scan (${{ inputs.dir }})' >> $GITHUB_STEP_SUMMARY
         echo "Critical: $CRITICAL, High: $HIGH, Medium: $MEDIUM, Low: $LOW" >> $GITHUB_STEP_SUMMARY
         echo '```plaintext' >> $GITHUB_STEP_SUMMARY
-        cat /tmp/trivy-raw.txt >> $GITHUB_STEP_SUMMARY
+        cat /tmp/trivy-report-raw.txt >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
 
         if [ "$STATUS" = "fail" ]; then

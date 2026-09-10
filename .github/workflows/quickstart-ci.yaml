@@ -3,6 +3,12 @@ name: CI
 
 on:
   workflow_call:
+    inputs:
+      trivy_severity:
+        description: Comma separated list of severities that fail the Trivy scan
+        type: string
+        default: CRITICAL,HIGH
+        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -48,6 +54,8 @@ jobs:
     needs: [ prepare ]
     name: Trivy scan (${{ matrix.dir }})
     if: ${{ github.event_name == 'pull_request' && needs.prepare.outputs.strategy != '[]' }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -57,6 +65,7 @@ jobs:
       - uses: gmo-media/tofu-actions/trivy-scan@v5
         with:
           dir: ${{ matrix.dir }}
+          severity: ${{ inputs.trivy_severity }}
 
   plan-comment:
     needs: [ prepare, plan, trivy ]
