@@ -120,6 +120,9 @@ runs:
 
         if [ "$trivy_found" = false ]; then
           echo 'No Trivy scan output found. If the scan is failing, check its logs.' >> /tmp/comment.txt
+        else
+          echo '' >> /tmp/comment.txt
+          echo 'To suppress a specific finding, see [Filtering resources by inline comments](https://trivy.dev/latest/docs/scanner/misconfiguration/config/config/#filtering-resources-by-inline-comments) (e.g. `#trivy:ignore:<ID>`).' >> /tmp/comment.txt
         fi
 
         echo 'comment<<EOF' >> $GITHUB_OUTPUT
