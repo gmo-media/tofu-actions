@@ -92,6 +92,7 @@ runs:
             severity=$(jq -r '.severity' <<<"$finding_json")
             id=$(jq -r '.id' <<<"$finding_json")
             title=$(jq -r '.title' <<<"$finding_json")
+            description=$(jq -r '.description' <<<"$finding_json")
             resource=$(jq -r '.resource' <<<"$finding_json")
             start=$(jq -r '.start' <<<"$finding_json")
             end=$(jq -r '.end' <<<"$finding_json")
@@ -99,10 +100,13 @@ runs:
             icon=$(sev_icon "$severity")
 
             location="$resource"
+            range=""
             if [ "$start" != "0" ]; then
               if [ "$start" = "$end" ]; then
+                range="$start"
                 location="$location (L$start)"
               else
+                range="$start-$end"
                 location="$location (L$start-$end)"
               fi
             fi
@@ -112,9 +116,35 @@ runs:
               echo "<summary>$icon $severity · $id · $location</summary>"
               echo ''
               echo "$title"
+              if [ -n "$description" ] && [ "$description" != "$title" ]; then
+                echo ''
+                echo "$description"
+              fi
               if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo ''
                 echo "See $url"
               fi
+
+              code_lines=$(jq -r '.code[]? | "\(.number)\t\(.cause)\t\(.content)"' <<<"$finding_json")
+              if [ -n "$code_lines" ]; then
+                echo ''
+                if [ -n "$range" ]; then
+                  echo "\`$target:$range\`"
+                else
+                  echo "\`$target\`"
+                fi
+                echo '```hcl'
+                while IFS=$'\t' read -r ln cause content; do
+                  if [ "$cause" = "true" ]; then
+                    marker='→'
+                  else
+                    marker=' '
+                  fi
+                  printf '%4s %s %s\n' "$ln" "$marker" "$content"
+                done <<< "$code_lines"
+                echo '```'
+              fi
+
               echo ''
               echo '</details>'
               echo ''
@@ -131,10 +161,12 @@ runs:
                 severity: .Severity,
                 id: (.ID // .AVDID // "UNKNOWN"),
                 title: .Title,
+                description: (.Description // ""),
                 resource: (.CauseMetadata.Resource // "-"),
                 start: (.CauseMetadata.StartLine // 0),
                 end: (.CauseMetadata.EndLine // 0),
-                url: (.PrimaryURL // "")
+                url: (.PrimaryURL // ""),
+                code: [(.CauseMetadata.Code.Lines // [])[] | {number: .Number, content: .Content, cause: (.IsCause // false)}]
               }]
             })[]
         ' /tmp/trivy.json)
