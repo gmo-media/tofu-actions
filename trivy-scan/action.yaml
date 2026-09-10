@@ -115,14 +115,10 @@ runs:
               echo "<details>"
               echo "<summary>$icon $severity · $id · $location</summary>"
               echo ''
-              echo "$title"
-              if [ -n "$description" ] && [ "$description" != "$title" ]; then
-                echo ''
+              if [ -n "$description" ] && [ "$description" != "null" ]; then
                 echo "$description"
-              fi
-              if [ -n "$url" ] && [ "$url" != "null" ]; then
-                echo ''
-                echo "See $url"
+              else
+                echo "$title"
               fi
 
               code_lines=$(jq -r '.code[]? | "\(.number)\t\(.cause)\t\(.content)"' <<<"$finding_json")
@@ -143,6 +139,11 @@ runs:
                   printf '%4s %s %s\n' "$ln" "$marker" "$content"
                 done <<< "$code_lines"
                 echo '```'
+              fi
+
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo ''
+                echo "See $url"
               fi
 
               echo ''

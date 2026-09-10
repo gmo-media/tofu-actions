@@ -1,0 +1,34 @@
+# TEMPORARY: verification workflow for trivy-scan / plan-comment integration.
+# Remove this file (and test-fixtures/*) before merging the feature PR.
+name: Test trivy scan (temporary)
+
+on:
+  pull_request:
+    paths:
+      - 'trivy-scan/**'
+      - 'plan-comment/**'
+      - 'test-fixtures/**'
+      - '.github/workflows/test-trivy-scan.yaml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  trivy-vulnerable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./trivy-scan
+        with:
+          dir: test-fixtures/vulnerable-tf
+
+  plan-comment:
+    needs: [ trivy-vulnerable ]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./plan-comment
+        with:
+          force-fail: ${{ contains(needs.*.result, 'failure') }}
