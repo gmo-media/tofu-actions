@@ -91,7 +91,7 @@ runs:
               badge='✅ Pass'
             fi
             echo "| $dir | $critical | $high | $medium | $low | $badge |" >> /tmp/comment.txt
-          done < <(cat /tmp/trivy-summary-*.txt)
+          done < <(find /tmp -maxdepth 1 -name 'trivy-summary-*.txt' -print0 | sort -z | xargs -0 cat)
         fi
 
         while IFS= read -r -d '' file; do
@@ -115,7 +115,7 @@ runs:
           cat $file >> /tmp/comment.txt
           echo '```' >> /tmp/comment.txt
           echo '</details>' >> /tmp/comment.txt
-        done < <(find /tmp -maxdepth 1 -name 'trivy-*.txt' ! -name 'trivy-summary-*' -print0)
+        done < <(find /tmp -maxdepth 1 -name 'trivy-*.txt' ! -name 'trivy-summary-*' -print0 | sort -z)
 
         if [ "$trivy_found" = false ]; then
           echo 'No Trivy scan output found. If the scan is failing, check its logs.' >> /tmp/comment.txt
