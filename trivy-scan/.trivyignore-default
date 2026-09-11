@@ -6,3 +6,10 @@
 # 参照: https://avd.aquasec.com/misconfig/avd-aws-0053/
 AWS-0053
 AVD-AWS-0053
+
+# AWS-0104 / AVD-AWS-0104: A security group rule should not allow unrestricted
+# egress to any IP address.
+# セキュリティグループの0.0.0.0/0への無制限egressを許容するため無効化する。
+# 参照: https://avd.aquasec.com/misconfig/avd-aws-0104/
+AWS-0104
+AVD-AWS-0104
