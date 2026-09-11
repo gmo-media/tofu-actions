@@ -1,4 +1,5 @@
 name: Configure Terraform/OpenTofu
+description: Authenticates to cloud providers and sets up Terraform/OpenTofu, then runs fmt, init, and validate.
 
 inputs:
   config:
@@ -23,7 +24,7 @@ runs:
   using: composite
   steps:
     # NOTE: Checkout is required before google-github-actions/auth
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
     - id: config
       uses: gmo-media/tofu-actions/read-config@v5
       with:
@@ -31,7 +32,7 @@ runs:
         dir: ${{ inputs.dir }}
 
     - if: ${{ contains(steps.config.outputs.auth-mode, 'aws-oidc') }}
-      uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+      uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
       with:
         aws-region: ${{ steps.config.outputs.auth-aws-region }}
         role-to-assume: ${{ inputs.mode == 'apply' && steps.config.outputs.auth-aws-apply-role || steps.config.outputs.auth-aws-plan-role }}
@@ -62,7 +63,7 @@ runs:
       with:
         terraform_wrapper: false
     - if: ${{ steps.config.outputs.tf-binary == 'tofu' }}
-      uses: opentofu/setup-opentofu@e95ccdd20623115bfd7d47df14a3250d6066a9d0 # v1.0.7
+      uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
       with:
         tofu_version_file: .opentofu-version
         tofu_wrapper: 'false'

@@ -1,0 +1,35 @@
+name: State List
+description: Runs tofu state list with an optional grep filter.
+
+inputs:
+  config:
+    description: tofu-actions config file
+    default: .github/tofu-actions-config.js
+  dir:
+    description: Directory to run in
+    required: true
+  filter:
+    description: grep filter (empty = show all)
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - id: configure
+      uses: gmo-media/tofu-actions/configure@v5
+      with:
+        config: ${{ inputs.config }}
+        dir: ${{ inputs.dir }}
+
+    - name: tofu state list
+      working-directory: ${{ inputs.dir }}
+      shell: bash
+      env:
+        TF_BINARY: ${{ steps.configure.outputs.tf-binary }}
+        FILTER: ${{ inputs.filter }}
+      run: |
+        if [ -n "$FILTER" ]; then
+          $TF_BINARY state list | grep -F "$FILTER" || true
+        else
+          $TF_BINARY state list
+        fi
