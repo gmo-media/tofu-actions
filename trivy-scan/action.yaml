@@ -193,13 +193,23 @@ runs:
         # the gate can never disagree with what's shown in the PR comment.
         STATUS=pass
         IFS=',' read -ra GATE_SEVERITIES <<< "${{ inputs.severity }}"
-        for sev in "${GATE_SEVERITIES[@]}"; do
+        for raw_sev in "${GATE_SEVERITIES[@]}"; do
+          # Tolerate incidental whitespace/case (e.g. "CRITICAL, HIGH" or "critical,high"),
+          # but fail loudly on anything else instead of silently treating it as count=0 --
+          # a typo here must not make the gate quietly go permissive.
+          sev=$(echo "$raw_sev" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
+          if [ -z "$sev" ]; then
+            continue
+          fi
           case "$sev" in
             CRITICAL) count=$CRITICAL ;;
             HIGH) count=$HIGH ;;
             MEDIUM) count=$MEDIUM ;;
             LOW) count=$LOW ;;
-            *) count=0 ;;
+            *)
+              echo "Unknown severity token in 'severity' input: '$raw_sev'. Expected a comma separated list of CRITICAL, HIGH, MEDIUM, LOW." >&2
+              exit 1
+              ;;
           esac
           if [ "$count" -gt 0 ]; then
             STATUS=fail
