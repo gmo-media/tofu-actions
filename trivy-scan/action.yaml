@@ -1,0 +1,257 @@
+name: Trivy scan
+description: Runs a Trivy IaC (misconfiguration) scan on a directory and uploads the result and severity summary as artifacts.
+
+inputs:
+  config:
+    description: tofu-actions config file
+    default: .github/tofu-actions-config.js
+  dir:
+    description: Directory to run in
+    required: true
+  severity:
+    description: Comma separated list of severities that fail the scan
+    default: CRITICAL,HIGH
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+    - name: Sanitize artifact name
+      id: artifact-name
+      shell: bash
+      run: |
+        DIR="${{ inputs.dir }}"
+        NAME="${DIR//\//___}"
+        echo "name=$NAME" >> $GITHUB_OUTPUT
+
+    - id: skip-dirs
+      name: Compute sibling/child dirs to skip
+      shell: bash
+      run: |
+        # Other directories configured in tofu-actions-config.js that are nested inside this
+        # dir (e.g. "prod/alink" when scanning "prod") get their own separate trivy-scan job,
+        # so `trivy config` must not recurse into them here — otherwise the same finding shows
+        # up twice (once in each job's comment), and an unrelated child dir's pre-existing HIGH
+        # finding can fail this dir's gate even though this dir itself wasn't touched.
+        #
+        # This is intentionally fail-soft: if the config can't be read/parsed for any reason,
+        # we fall back to no skip-dirs (today's behavior) rather than failing the scan — trivy-scan
+        # otherwise has no dependency on tofu-actions-config.js being valid (e.g. it needs no
+        # AWS/GCP auth config), and this optimization shouldn't introduce one.
+        SKIP_DIRS=$(node -e "
+          const path = require('node:path');
+          const dir = '${{ inputs.dir }}';
+          import(path.resolve(process.cwd(), '${{ inputs.config }}'))
+            .then(m => {
+              const dirs = Object.keys((m.default && m.default.dirs) || {});
+              const children = dirs
+                .filter(d => d !== dir && d.startsWith(dir + '/'))
+                .map(d => d.slice(dir.length + 1));
+              console.log(children.join(','));
+            })
+            .catch(() => console.log(''));
+        " 2>/dev/null || true)
+        echo "value=$SKIP_DIRS" >> $GITHUB_OUTPUT
+
+    - name: Trivy scan (json)
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        scan-type: config
+        scan-ref: ${{ inputs.dir }}
+        scanners: misconfig
+        format: json
+        output: /tmp/trivy.json
+        severity: LOW,MEDIUM,HIGH,CRITICAL
+        skip-dirs: ${{ steps.skip-dirs.outputs.value }}
+        exit-code: '0'
+        hide-progress: true
+
+    - id: result
+      name: Save result and summary
+      shell: bash
+      run: |
+        DETAIL_FILE="/tmp/trivy-${{ steps.artifact-name.outputs.name }}.txt"
+        : > "$DETAIL_FILE"
+
+        sev_icon() {
+          case "$1" in
+            CRITICAL) printf '🟣';;
+            HIGH) printf '🔴';;
+            MEDIUM) printf '🟠';;
+            LOW) printf '🟡';;
+            *) printf '⚪';;
+          esac
+        }
+
+        # Build nested <details> markdown: file > resource (finding), for the PR comment.
+        # The full raw table output remains available in the job summary below.
+        while IFS= read -r result_json; do
+          target=$(jq -r '.target' <<<"$result_json")
+          count=$(jq -r '.findings | length' <<<"$result_json")
+
+          {
+            echo "<details>"
+            echo "<summary>📄 $target — $count issues</summary>"
+            echo ''
+          } >> "$DETAIL_FILE"
+
+          while IFS= read -r finding_json; do
+            severity=$(jq -r '.severity' <<<"$finding_json")
+            id=$(jq -r '.id' <<<"$finding_json")
+            title=$(jq -r '.title' <<<"$finding_json")
+            description=$(jq -r '.description' <<<"$finding_json")
+            resource=$(jq -r '.resource' <<<"$finding_json")
+            start=$(jq -r '.start' <<<"$finding_json")
+            end=$(jq -r '.end' <<<"$finding_json")
+            url=$(jq -r '.url' <<<"$finding_json")
+            icon=$(sev_icon "$severity")
+
+            range=""
+            if [ "$start" != "0" ]; then
+              if [ "$start" = "$end" ]; then
+                range="$start"
+              else
+                range="$start-$end"
+              fi
+            fi
+
+            {
+              echo "<details>"
+              echo "<summary>$icon $severity · $id · $title · $resource</summary>"
+              echo ''
+              if [ -n "$description" ] && [ "$description" != "null" ]; then
+                echo "$description"
+              fi
+
+              code_lines=$(jq -r '.code[]? | "\(.number)\t\(.cause)\t\(.content)"' <<<"$finding_json")
+              if [ -n "$code_lines" ]; then
+                echo ''
+                if [ -n "$range" ]; then
+                  echo "\`$target:$range\`"
+                else
+                  echo "\`$target\`"
+                fi
+                # Use a 4-backtick fence: the code content originates from user HCL and may itself
+                # contain a triple-backtick sequence (e.g. in a heredoc or comment), which would
+                # otherwise close the fence early and corrupt the rest of the comment.
+                echo '````hcl'
+                while IFS=$'\t' read -r ln cause content; do
+                  if [ "$cause" = "true" ]; then
+                    marker='→'
+                  else
+                    marker=' '
+                  fi
+                  printf '%4s %s %s\n' "$ln" "$marker" "$content"
+                done <<< "$code_lines"
+                echo '````'
+              fi
+
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo ''
+                echo "See $url"
+              fi
+
+              echo ''
+              echo '</details>'
+              echo ''
+            } >> "$DETAIL_FILE"
+          done < <(jq -c '.findings[]' <<<"$result_json")
+
+          echo '</details>' >> "$DETAIL_FILE"
+          echo '' >> "$DETAIL_FILE"
+        done < <(jq -c '
+          [.Results[]? | select((.Misconfigurations // []) | length > 0)]
+          | map({
+              target: .Target,
+              findings: [.Misconfigurations[] | {
+                severity: .Severity,
+                id: (.ID // .AVDID // "UNKNOWN"),
+                title: .Title,
+                description: (.Description // ""),
+                resource: (.CauseMetadata.Resource // "-"),
+                start: (.CauseMetadata.StartLine // 0),
+                end: (.CauseMetadata.EndLine // 0),
+                url: (.PrimaryURL // ""),
+                code: [(.CauseMetadata.Code.Lines // [])[] | {number: .Number, content: .Content, cause: (.IsCause // false)}]
+              }]
+            })[]
+        ' /tmp/trivy.json)
+
+        if [ ! -s "$DETAIL_FILE" ]; then
+          echo 'No issues found.' > "$DETAIL_FILE"
+        fi
+
+        CRITICAL=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="CRITICAL")] | length' /tmp/trivy.json)
+        HIGH=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="HIGH")] | length' /tmp/trivy.json)
+        MEDIUM=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="MEDIUM")] | length' /tmp/trivy.json)
+        LOW=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="LOW")] | length' /tmp/trivy.json)
+        TOTAL=$((CRITICAL + HIGH + MEDIUM + LOW))
+
+        # Determine pass/fail purely from the counts derived above (same JSON as the matrix
+        # and the nested details), instead of running a separate gate scan. This guarantees
+        # the gate can never disagree with what's shown in the PR comment.
+        STATUS=pass
+        IFS=',' read -ra GATE_SEVERITIES <<< "${{ inputs.severity }}"
+        for raw_sev in "${GATE_SEVERITIES[@]}"; do
+          # Tolerate incidental whitespace/case (e.g. "CRITICAL, HIGH" or "critical,high"),
+          # but fail loudly on anything else instead of silently treating it as count=0 --
+          # a typo here must not make the gate quietly go permissive.
+          sev=$(echo "$raw_sev" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
+          if [ -z "$sev" ]; then
+            continue
+          fi
+          case "$sev" in
+            CRITICAL) count=$CRITICAL ;;
+            HIGH) count=$HIGH ;;
+            MEDIUM) count=$MEDIUM ;;
+            LOW) count=$LOW ;;
+            *)
+              echo "Unknown severity token in 'severity' input: '$raw_sev'. Expected a comma separated list of CRITICAL, HIGH, MEDIUM, LOW." >&2
+              exit 1
+              ;;
+          esac
+          if [ "$count" -gt 0 ]; then
+            STATUS=fail
+            break
+          fi
+        done
+
+        # Pipe-delimited summary line consumed by plan-comment: dir|critical|high|medium|low|total|status
+        echo "${{ inputs.dir }}|$CRITICAL|$HIGH|$MEDIUM|$LOW|$TOTAL|$STATUS" > /tmp/trivy-summary-${{ steps.artifact-name.outputs.name }}.txt
+
+        # Render the human-readable table from the already-computed JSON (no re-scan), using
+        # `trivy convert`. The trivy binary is already on $GITHUB_PATH, added by the setup-trivy
+        # step that ran as part of "Trivy scan (json)" above.
+        trivy convert --format table --scanners misconfig --severity LOW,MEDIUM,HIGH,CRITICAL --output /tmp/trivy-report-raw.txt /tmp/trivy.json
+
+        echo '### Trivy scan (${{ inputs.dir }})' >> $GITHUB_STEP_SUMMARY
+        echo "Critical: $CRITICAL, High: $HIGH, Medium: $MEDIUM, Low: $LOW" >> $GITHUB_STEP_SUMMARY
+        echo '```plaintext' >> $GITHUB_STEP_SUMMARY
+        cat /tmp/trivy-report-raw.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+        if [ "$STATUS" = "fail" ]; then
+          echo "has-issues=true" >> $GITHUB_OUTPUT
+        else
+          echo "has-issues=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload trivy text
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      with:
+        name: trivy-text-${{ steps.artifact-name.outputs.name }}
+        path: /tmp/trivy-${{ steps.artifact-name.outputs.name }}.txt
+
+    - name: Upload trivy summary
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      with:
+        name: trivy-summary-${{ steps.artifact-name.outputs.name }}
+        path: /tmp/trivy-summary-${{ steps.artifact-name.outputs.name }}.txt
+
+    - if: ${{ steps.result.outputs.has-issues == 'true' }}
+      name: Fail if severity threshold exceeded
+      shell: bash
+      run: |
+        echo "Trivy found issues at severity ${{ inputs.severity }} or above. See the scan output above / PR comment for details."
+        exit 1

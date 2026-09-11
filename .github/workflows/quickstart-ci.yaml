@@ -3,6 +3,18 @@ name: CI
 
 on:
   workflow_call:
+    inputs:
+      trivy_severity:
+        description: >-
+          Comma separated list of severities that fail the Trivy scan.
+          Default is empty (report-only: findings are shown in the PR comment but never fail the check).
+          Set to e.g. CRITICAL,HIGH to enforce a gate.
+          Note: this report-only default is for the v5 rollout only. A future major release (v6)
+          is planned to make CRITICAL,HIGH the default and enforce blocking; repos that want to
+          opt in early can already set this input explicitly.
+        type: string
+        default: ''
+        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -44,8 +56,25 @@ jobs:
         with:
           dir: ${{ matrix.dir }}
 
+  trivy:
+    needs: [ prepare ]
+    name: Trivy scan (${{ matrix.dir }})
+    if: ${{ github.event_name == 'pull_request' && needs.prepare.outputs.strategy != '[]' }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.strategy) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: gmo-media/tofu-actions/trivy-scan@v5
+        with:
+          dir: ${{ matrix.dir }}
+          severity: ${{ inputs.trivy_severity }}
+
   plan-comment:
-    needs: [ prepare, plan ]
+    needs: [ prepare, plan, trivy ]
     if: ${{ always() && github.event_name == 'pull_request' }}
     name: Plan comment
     runs-on: ubuntu-latest
