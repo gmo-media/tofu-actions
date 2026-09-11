@@ -7,13 +7,11 @@ on:
       trivy_severity:
         description: >-
           Comma separated list of severities that fail the Trivy scan.
-          Default is empty (report-only: findings are shown in the PR comment but never fail the check).
-          Set to e.g. CRITICAL,HIGH to enforce a gate.
-          Note: this report-only default is for the v5 rollout only. A future major release (v6)
-          is planned to make CRITICAL,HIGH the default and enforce blocking; repos that want to
-          opt in early can already set this input explicitly.
+          Default is CRITICAL,HIGH (blocking: the check fails when a finding at or above this
+          severity is detected). Set to an empty string to opt back into report-only mode
+          (findings are shown in the PR comment but never fail the check).
         type: string
-        default: ''
+        default: 'CRITICAL,HIGH'
         required: false
 
 concurrency:
