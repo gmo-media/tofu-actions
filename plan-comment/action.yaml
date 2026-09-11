@@ -143,7 +143,7 @@ runs:
 
     - if: ${{ steps.composite.outputs.plan-length > 50000 }}
       name: Add plan comment (too long)
-      uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
+      uses: mshick/add-pr-comment@ec328af66588ab8f77cdeb2c264f14aba45bbf59 # v3.12.0
       with:
         message-id: plan-${{ github.event.pull_request.number }}
         message-failure: Plan was not successful
@@ -162,7 +162,7 @@ runs:
 
     - if: ${{ steps.composite.outputs.plan-length <= 50000 }}
       name: Add plan comment
-      uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
+      uses: mshick/add-pr-comment@ec328af66588ab8f77cdeb2c264f14aba45bbf59 # v3.12.0
       with:
         message-id: plan-${{ github.event.pull_request.number }}
         message-failure: Plan was not successful
@@ -170,7 +170,7 @@ runs:
 
     - if: ${{ steps.composite.outputs.trivy-length > 50000 }}
       name: Add trivy comment (too long)
-      uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
+      uses: mshick/add-pr-comment@ec328af66588ab8f77cdeb2c264f14aba45bbf59 # v3.12.0
       with:
         message-id: trivy-${{ github.event.pull_request.number }}
         message-failure: Trivy scan was not successful
@@ -183,7 +183,7 @@ runs:
 
     - if: ${{ steps.composite.outputs.trivy-length <= 50000 }}
       name: Add trivy comment
-      uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
+      uses: mshick/add-pr-comment@ec328af66588ab8f77cdeb2c264f14aba45bbf59 # v3.12.0
       with:
         message-id: trivy-${{ github.event.pull_request.number }}
         message-failure: Trivy scan was not successful
