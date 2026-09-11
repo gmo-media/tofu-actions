@@ -1,0 +1,8 @@
+# 組織全体のデフォルト除外ルール（trivy-scan action から常時読み込まれる）。
+#
+# AWS-0053 / AVD-AWS-0053: Load balancer is exposed publicly.
+# ALB/NLBをinternet-facing(internal=false)にすること自体は正当な設計判断として許容するため無効化する。
+# チェックの意図（意図しない公開を防ぐための警告）は理解した上で、組織として意図的な公開を許容する。
+# 参照: https://avd.aquasec.com/misconfig/avd-aws-0053/
+AWS-0053
+AVD-AWS-0053
