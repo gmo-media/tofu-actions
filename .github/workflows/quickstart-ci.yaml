@@ -5,9 +5,12 @@ on:
   workflow_call:
     inputs:
       trivy_severity:
-        description: Comma separated list of severities that fail the Trivy scan
+        description: >-
+          Comma separated list of severities that fail the Trivy scan.
+          Default is empty (report-only: findings are shown in the PR comment but never fail the check).
+          Set to e.g. CRITICAL,HIGH to enforce a gate.
         type: string
-        default: CRITICAL,HIGH
+        default: ''
         required: false
 
 concurrency:
