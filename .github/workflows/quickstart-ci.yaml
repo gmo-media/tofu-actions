@@ -15,6 +15,17 @@ on:
         type: string
         default: ''
         required: false
+      trivy_trivyignores:
+        description: >-
+          Comma separated list of additional .trivyignore file paths, relative to
+          this repository, to merge with the org-wide default ignores (see
+          gmo-media/tofu-actions trivy-scan action). A .trivyignore at this
+          repository's root is auto-detected and merged in even without setting
+          this input; use this only for extra files elsewhere. The org-wide
+          defaults always apply regardless; nothing here can replace them.
+        type: string
+        default: ''
+        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -72,6 +83,7 @@ jobs:
         with:
           dir: ${{ matrix.dir }}
           severity: ${{ inputs.trivy_severity }}
+          trivyignores: ${{ inputs.trivy_trivyignores }}
 
   plan-comment:
     needs: [ prepare, plan, trivy ]

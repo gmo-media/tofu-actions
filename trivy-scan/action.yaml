@@ -11,6 +11,16 @@ inputs:
   severity:
     description: Comma separated list of severities that fail the scan
     default: CRITICAL,HIGH
+  trivyignores:
+    description: >-
+      Comma-separated list of additional .trivyignore file paths, relative to the
+      repository being scanned, to merge with the org-wide default ignores
+      (trivy-scan/.trivyignore-default in this repo). A .trivyignore at the
+      repository root is auto-detected and merged in even without setting this
+      input; use this only for extra files elsewhere (e.g. per-directory
+      ignores). The org-wide defaults always apply regardless; nothing here can
+      replace them.
+    default: ''
 
 runs:
   using: composite
@@ -54,6 +64,30 @@ runs:
         " 2>/dev/null || true)
         echo "value=$SKIP_DIRS" >> $GITHUB_OUTPUT
 
+    - id: trivyignores
+      name: Compute combined trivyignore file list
+      shell: bash
+      run: |
+        # Org-wide defaults (owned by this action) always apply; a repo-root
+        # .trivyignore (auto-detected) and a caller-supplied trivyignores input
+        # are merged in addition to them, never in place of them.
+        # aquasecurity/trivy-action concatenates comma-separated plain trivyignore
+        # files itself, so listing them all here is enough to merge them.
+        FILES="${{ github.action_path }}/.trivyignore-default"
+
+        # Auto-detect a repo-root .trivyignore so callers don't need to wire
+        # trivyignores explicitly just to add their own repo-level ignores.
+        if [ -f ".trivyignore" ]; then
+          FILES="${FILES},.trivyignore"
+        fi
+
+        EXTRA="${{ inputs.trivyignores }}"
+        if [ -n "$EXTRA" ]; then
+          FILES="${FILES},${EXTRA}"
+        fi
+
+        echo "value=$FILES" >> $GITHUB_OUTPUT
+
     - name: Trivy scan (json)
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
       with:
@@ -64,6 +98,7 @@ runs:
         output: /tmp/trivy.json
         severity: LOW,MEDIUM,HIGH,CRITICAL
         skip-dirs: ${{ steps.skip-dirs.outputs.value }}
+        trivyignores: ${{ steps.trivyignores.outputs.value }}
         exit-code: '0'
         hide-progress: true
 
